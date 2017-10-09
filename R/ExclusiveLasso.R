@@ -55,6 +55,7 @@
 #'
 #' exfit <- exclusive_lasso(X, y, groups)
 #' @importFrom stats median weighted.mean
+#' @importFrom Matrix Matrix
 #' @export
 exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "poisson"),
                             weights, offset, nlambda=100,
@@ -156,6 +157,8 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     coef <- exclusive_lasso_gaussian(X=Xsc, y=y, groups=groups,
                                      lambda=lambda, w=weights, o=offset,
                                      thresh_prox=thresh_prox, thresh_pg=thresh_pg)
+
+    coef <- Matrix(coef, sparse=TRUE)
 
     ## Convert coefficients back to original scale
     if(standardize){

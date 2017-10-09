@@ -1,3 +1,5 @@
+context("Proximal operator works")
+
 prox <- function(...) as.vector(ExclusiveLasso:::exclusive_lasso_prox(...))
 
 norm_1 <- function(x) sum(abs(x))

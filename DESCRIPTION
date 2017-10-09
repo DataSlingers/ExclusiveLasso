@@ -11,7 +11,7 @@ Description: Fit Generalized Linear Models ("GLMs") using the "Exclusive Lasso"
     penalty of Zhou et al (2010) using the Inexact Proximal Gradient algorithm
     of Campbell and Allen (2017).
 License: GPL (>= 2)
-Imports: Rcpp (>= 0.12.12)
+Imports: Rcpp (>= 0.12.12), Matrix
 LinkingTo: Rcpp, RcppArmadillo
 Suggests: testthat, knitr, microbenchmark
 VignetteBuilder: knitr

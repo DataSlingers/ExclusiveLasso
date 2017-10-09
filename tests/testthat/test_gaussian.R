@@ -1,3 +1,5 @@
+context("Gaussian response GLM works")
+
 test_that("Input validation works", {
     set.seed(123)
     ## Good inputs
@@ -204,7 +206,7 @@ test_that("Returns prox for orthogonal case", {
     prox_coefs <- ExclusiveLasso:::exclusive_lasso_prox(crossprod(X, y),
                                                         groups, lambda * n)
 
-    expect_equal(elfit$coef, prox_coefs)
+    expect_equal(as.matrix(elfit$coef), prox_coefs, check.attributes=FALSE)
 })
 
 test_that("Returns ridge with trivial group structure", {
@@ -229,7 +231,8 @@ test_that("Returns ridge with trivial group structure", {
     for(i in seq_len(nlambda)){
         expect_equal(solve(crossprod(X)/n + elfit$lambda[i] * diag(1, p, p),
                            crossprod(X, y)/n),
-                     elfit$coef[,i, drop=FALSE])
+                     as.matrix(elfit$coef[,i, drop=FALSE]),
+                     check.attributes=FALSE)
     }
 
     ## High-Dimensional
@@ -252,7 +255,8 @@ test_that("Returns ridge with trivial group structure", {
     for(i in seq_len(nlambda)){
         expect_equal(solve(crossprod(X)/n + elfit$lambda[i] * diag(1, p, p),
                            crossprod(X, y)/n),
-                     elfit$coef[, i, drop=FALSE])
+                     as.matrix(elfit$coef[, i, drop=FALSE]),
+                     check.attributes=FALSE)
     }
 })
 

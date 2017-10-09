@@ -1,0 +1,226 @@
+---
+title: "Introduction to the `ExclusiveLasso` Package"
+author: "Michael Weylandt"
+date: "2017-10-06"
+output: html_vignette
+bibliography: vignettes.bibtex
+vignette: >
+  %\VignetteIndexEntry{Introduction to the ExclusiveLasso Package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r echo=FALSE,cache=FALSE}
+set.seed(1234)
+knitr::opts_chunk$set(cache=TRUE)
+```
+\[
+\DeclareMathOperator{\argmin}{arg\,min}
+\DeclareMathOperator{\sign}{sign}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bz}{\mathbf{z}}
+\DeclareMathOperator{\prox}{\textsf{prox}}
+\]
+
+The `ExclusiveLasso` package implements the exclusive lasso penalty of Zhou *et
+al.* [-@Zhou:2010], which Obozinski and Bach showed is the tightest convex
+relaxation of the combinatorial "exactly one non-zero element in each group"
+[-@Obozinski:2012, Section 4.2]. We use a proximal gradient algorithm, with
+coordinate descent used to evaluate the proximal operator, as proposed by
+Campbell and Allen [-@Campbell:2017].
+
+The scalings used in the `ExclusiveLasso` package are not exactly those
+used by Campbell and Allen, so we describe the algorithms used in the package
+in detail below.
+
+## Usage
+
+## Algorithmic Details
+
+We use the "$1/n$"-scaling for penalized regression, as well as including a
+factor of $1/2$ in the penalty term:
+
+\[\hat{\beta}_{\text{EL}} = \argmin -\frac{1}{n}\sum_{i=1}^n \ell(y_i; \bx_i^T\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2} \tag{EL-GLM}\]
+
+where $\ell(y_i; \bx_i^T\beta)$ is the log-likelihood of the observation $(\bx_i, y_i)$.
+
+In the Gaussian case, this can be simplified to
+\[\hat{\beta}_{\text{EL}} = \argmin \frac{1}{2n}\|\by - \bX\beta\|_2^2 + \underbrace{\lambda \sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}}_{\lambda * P(\beta)} \tag{EL-Gaussian} \label{eq:el-gaussian}\]
+
+We note that in the case where $\mathcal{G} = \left\{\{1\}, \{2\}, \dots, \{p\}\right\}$
+-- that is, there is no meaningful group structure -- the penalty simplifies to the
+standard ridge penalty $\frac{\lambda}{2}\|\beta\|_2^2$.
+
+### Proximal Gradient
+
+Campbell and Allen propose the use of a *proximal gradient* algorithm to solve
+Problem $\eqref{eq:el-gaussian}$. Proximal gradient algorithms, made popular in the
+sparse regression context by the "ISTA" algorithm of Beck and Teboulle [-@Beck:2009],
+combine a gradient descent-type update for the smooth part of the objective with
+the proximal operator associated with the non-smooth part. They are particularly
+common for problems where the non-smooth part has a simple (or even closed form)
+solution. Proximal gradient have been applied to a wide-range of problems.
+See, *e.g.*,  Parikh and Boyd [-@Parikh:2014] for a review.
+
+For a general penalized regression problem of the form
+\[\argmin_{\beta} f(\beta) + \lambda g(\beta)\]
+where $f(\cdot)$ is convex and smooth and $g(\cdot)$ is convex, but not smooth,
+proximal gradient algorithms work by iterating
+\[\beta^{(k)} = \prox_{t_k \lambda g}\left(\beta^{(k-1)} - t_k \nabla f(\beta^{(k-1)}\right)\]
+until convergence, where $t_k$ is a step-size which may be fixed or chosen by
+a line-search method, and $\prox$ is the proximal operator of $t_k \lambda g$:
+\[\prox_{t_k \lambda g}(z) = \argmin_x t_k \lambda g(x) + \frac{1}{2}\|x - z\|_2^2\]
+
+Note that, unlike the use of the proximal operator in ADMM and similar methods
+[@Boyd:2011], the step-size $t_k$ appears in the proximal operator.
+
+The name "ISTA" comes from the proximal operator of the $\ell_1$-norm:
+\[\prox_{\lambda |\cdot|}(z) = \argmin_x \lambda |x| + \frac{1}{2}(x - z)^2\]
+which is the so-called "soft-thresholding" operator:
+\[\mathcal{S}_{\lambda}(x) = \begin{cases} x - \lambda & x > \lambda \\ 0 & |x| \leq \lambda \\ x + \lambda & x < -\lambda \end{cases}\]
+which gives the iterative soft-thresholding algorithm:
+\[\beta^{(k)} = \mathcal{S}_{t\lambda}\left(\beta^{(k-1)} - \frac{t}{n}\bX^T(y - \bX\beta^{(k-1)})\right) = \mathcal{S}_{t\lambda}\left((\bI + t \bX^T\bX/n)\beta^{(k-1)} - t\bX^T\by/n\right)\]
+where $t = 1 / \lambda_{\text{max}}(X^TX/n)$ is a constant step-size ensuring convergence.
+
+Hence, for Problem $\eqref{eq:el-gaussian}$, the proximal gradient algorithm becomes
+\[\beta^{(k)} = \prox_{t \lambda P(\cdot)}\left((\bI + t\bX^T\bX/n)\beta^{(k-1)} - t\bX^T\by/n\right)\]
+
+Unlike the standard $\ell_1$-penalization case, this proximal operator cannot be
+evaluated in closed form and an iterative algorithm must be used to approximate the
+proximal operator. This gives rise to a so-called *inexact proximal gradient* scheme,
+convergence conditions of which were analyzed by Schmidt *et al.* [-@Schmidt:2011].
+Campbell and Allen propose the use of a coordinate-descent scheme to evaluate
+the proximal operator, described in more detail below.
+
+### Evaluation of the Proximal Operator
+
+We wish to evaluate the proximal operator:
+\[\argmin_{x} \frac{1}{2}\|x - z\|_2^2 + \frac{c}{2}\sum_{g \in \mathcal{G}} \|x_g\|_1^2\]
+Note that we fold the constant terms into a single term $c$ in this subsection.
+
+Campbell and Allen propose the use of coordinate descent [@Shi:2016] for this
+problem and show that it converges, using the sufficient conditions of
+[@Tseng:2001].
+
+We first note that the proximal operator can be split according to the group structure:[^1]
+\[\frac{1}{2}\|x - z\|_2^2 + \frac{c}{2}\sum_{g \in \mathcal{G}} \|x_g\|_1^2 = \sum_{g \in \mathcal{G}} \frac{1}{2}\|x_g - z_g\|_2^2 + \frac{c}{2}\|x_g\|_1^2 \]
+so it suffices to derive the coordinate updates for the simpler problem:
+\[\frac{1}{2}\|x - z\|_2^2 + \frac{c}{2}\|x\|_1^2\]
+Without loss of generality, we derive the update formula for $x_1$:
+\[\argmin_{x_1} \frac{1}{2}\|x - z\|_2^2 + \frac{c}{2} \|x\|_1^2 \implies \argmin_{x_1} \frac{1}{2}(x_1 - z_1)^2 + \frac{c}{2}\left(2|x_1| * \|x_{-1}\|_1 + x_1^2\right)\]
+Re-grouping and adjusting constant terms, this becomes:
+\[\begin{align*}
+& \argmin_{x_1} \frac{1}{2}(x_1 - z_1)^2 + \frac{c}{2}\left(2|x_1| * \|x_{-1}\|_1 + x_1^2\right) \\
+\implies &\argmin_{x_1} \frac{x_1^2 - 2x_1z_1 + z_1^2 + 2c\|x_{-1}\|_1 * |x_1| + cx_1^2}{2} \\
+\implies &\argmin_{x_1} \frac{(1+c)x_1^2 - 2x_1z_1 + z_1^2 + 2c\|x_{-1}\|_1 * |x_1|}{2} \\
+\implies &\argmin_{x_1} \frac{1}{2} 2c\|x_{-1}\|*|x_1| + \frac{1}{2}\left[(1+c)x_1^2 - 2x_1z_1\right] \\
+\implies &\argmin_{x_1} \frac{c}{1+c}\|x_{-1}\|*|x_1| + \frac{1}{2(1+c)}\left[(1+c)x_1^2 - 2x_1z_1\right] \\
+\implies &\argmin_{x_1} \frac{c}{1+c}\|x_{-1}\|*|x_1| + \frac{1}{2}\left[x_1^2 - 2x_1\frac{z_1}{1+c}\right] \\
+\implies &\argmin_{x_1} \frac{c}{1+c}\|x_{-1}\|_1 * |x_1| + \frac{1}{2}\left[x_1^2 - 2x_1 \frac{z_1}{1+c} + \frac{z_1^2}{(1+c)^2}\right] \\
+\implies &\argmin_{x_1} \frac{c}{1+c} \|x_{-1}\|_1 * |x_1| + \frac{1}{2}\left(x_1 - \frac{1}{1+c}z_1\right)^2
+\end{align*}\]
+which we recognize as the proximal operator of the scaled absolute value function
+\[f(y) = \frac{c}{1+c}\|x_{-1}|_1 * |y|\] evaluated at $\frac{z_1}{1+c}$
+giving the coordinate update:
+\[x_i \leftarrow \mathcal{S}_{\frac{c}{1 + c} \|x^{-i}\|}\left(\frac{1}{1 + c} z_i\right)\]
+
+Pulling the common $(1+c)^{-1}$ term out we get:
+\[x_i \leftarrow \frac{1}{1+c} \mathcal{S}_{c\|x^{-i}\|}\left(z_i\right)\]
+
+### Combined Algorithm
+
+Putting these pieces together, we get the following Exclusive Lasso algorithm
+for $\eqref{eq:el-gaussian}$.
+
+1. Initialize
+    - $\beta^{(0)} = 0$
+    - $t = \lambda_{\text{max}}(\bX^T\bX/n)^{-1}$
+    - $k = 1$
+2. Repeat Until Convergence:
+    - $\bz^{(k-1)} = (\bI + t \bX^T\bX/n)\beta^{(k-1)} - t \bX^T\by/n$
+    - For each group $g \in \mathcal{G}$:
+        - Initialize $x_g = 0$
+        - Repeat until convergence, looping over each $i \in g$:
+          \[x_{g, i} = \mathcal{S}_{\frac{2t\lambda}{1 + t\lambda}\|x_{g, -i}\|_1}\left(\frac{t\lambda}{1+t\lambda} z_{g, i}\right)\]
+    - $\beta^{(k)} = x$
+    - $k := k + 1$.
+
+## Stationary Conditions
+
+In this section, we derive and re-state some of the stationarity conditions
+from Campbell and Allen with the scaling conventions used by the `ExclusiveLasso`
+package. Many of these are used internally to test the correctness of the package.
+
+We first derive the subdifferential of the penalty:
+\[P(\beta) = \sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}\]
+We abuse notation slightly here and use $x$ and $\{x\}$ interchangeably.
+
+Clearly, this separates group-wise so we first consider the single group case:
+\[P(\beta_g) = \frac{\|\beta_g\|_1^2}{2} = \frac{1}{2} \left(\sum_{i \in g } |\beta_{i}|\right)^2\]
+
+If $\beta_{i}$ is non-zero, then $P$ is differentiable with respect to $\beta_i$ and
+the subdifferential is given by the classical derivative:
+\[\partial_{\beta_i} P(\beta_g) = \frac{1}{2} 2 *\left(|\beta_i| + \|\beta_{-i}\|_1\right) * \sign(\beta_i) = \sign(\beta_i) \|\beta_g\|_1\]
+
+
+If $\beta_{i}$ is zero, the subdifferential can be evaluted similarly, using
+the well-known subdifferential of the absolute value operator at zero:
+\[\partial_{\beta_i} P(\beta_g) = \frac{1}{2} * 2 * \left(|\beta_i| + \|\beta_{-i}\|_1\right) * [-1, 1] = [-\|\beta_g\|_1, \|\beta_g\|_1]\]
+Since $\beta_i = 0$, $\|\beta_{-i}\|_{1} = \|\beta_g\|_1$ here, which lets
+us simplify notation.
+
+Together, this gives
+\[\partial_{\beta_i} P(\beta) = \partial(|\beta_i|) * \|\beta_g\|_1 = \begin{cases} \sign(\beta_i) \|\beta_g\|_1 & \beta_i \neq 0 \\ [-\|\beta_g\|_1, \|\beta_g\|_1] &\beta_i = 0 \end{cases}\]
+
+### Proximal Operator
+
+From the above, we can derive KKT conditions for the proximal operator quickly:
+\[\bz = \prox_{\lambda P(\cdot)}(\bx) = \argmin_{\bz} \frac{1}{2} \|\bx - \bz\|_2^2 + \frac{\lambda}{2}P(\bz)\]
+giving
+\[\bz = \prox_{\lambda P(\cdot)}(\bx) \Longleftrightarrow 0 \in (x_i - z_i) + \partial_{z_i}P(\bz)\]
+
+If $z_i \neq 0$, this gives the check:
+\[0 = (x_i - z_i) + \lambda \sign(z_i)\|z_g\|_1 \implies x_i = z_i + \lambda \sign(z_i)\|z_g\|_1\]
+for $i \in g$. Similarly, if $z_i = 0$, this gives the check:
+\[0 \in (x_i - \underbrace{z_i}_{=0}) + \lambda [-\|z_g\|_1, \|z_g\|_1] \implies |x_i| \leq \lambda \|z_g\| \]
+
+A symmetry argument makes clear that if $\bz = \prox_{\lambda P(\cdot)}(\bx)$,
+then we must have $\sign(z_i) \in \{0, \sign(x_i)\}$ for all $i$.
+
+We can also derive explicit formulae for the proximal operator in a few cases:
+
+- $\lambda = 0$: $\prox_{0 * P(\cdot)}(\bx) = \bx$
+- Groups of size 1: $\prox_{\lambda P(\cdot)}(\bx) = \frac{\bx}{1+\lambda}$
+
+Furthermore, if $\prox_{\lambda P(\cdot)}(\bx)$ has only a single non-zero
+element in a group, $z_i \neq 0$, then it must satisfy
+\[z_i = \frac{1}{1+\lambda} x_i\]
+which generalizes the result above.  This is connected to the result that that
+the exclusive lasso reduces to ridge regression when all groups are of size one.
+
+### Exclusive Lasso
+
+For the general problem, the KKT conditions are given by:
+\[0 \in -\bX^T(\by - \bX\beta) + \lambda \partial P(\beta)\]
+
+Restricting attention to the (estimated) support $\hat{\beta}_{\hat{S}}$,
+Campbell and Allen (2017, Proposition 1) show that $\hat{\beta}_{\hat{S}}$ has
+a closed-form solution, conditional on the signed support, given by
+\[\hat{\beta}_{\hat{S}} = (\bX_{\hat{S}}^T\bX_{\hat{S}}/n + \lambda \bM_\hat{S})^{\dagger}\bX_{hat{S}}^T\by/n\]
+where $\bM_{\hat{S}}$ is a block-diagonal matrix[^2] with blocks given by
+$\text{sign}(\hat{\beta}_{\hat{S} \cap g})\text{sign}(\hat{\beta}_{\hat{S} \cap g})^T$.
+Note that we have an additional factor of $1/n$ due to the extra $n^{-1}$ in
+our problem formulation.
+
+## Statistical Properties
+
+## References
+
+[^1]: We can also take advantage of the group-structure to evaluate the proximal operator
+in parallel, though this is currently not implemented in the `ExclusiveLasso` package.
+
+[^2]: $\bM_{\hat{S}}$ may be a *permuted* block-diagonal matrix if the group structure
+does not correspond to adjacent columns of $\bX$.

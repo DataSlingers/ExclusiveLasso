@@ -197,6 +197,10 @@ has_intercept <- function(x){
     !is.null(x$intercept)
 }
 
+has_offset <- function(x){
+    any(x$offset != 0)
+}
+
 #' @export
 print.ExclusiveLassoFit <- function(x, ...){
     cat("Exclusive Lasso Fit", "\n")
@@ -218,4 +222,148 @@ print.ExclusiveLassoFit <- function(x, ...){
     cat("\n")
 
     invisible(x)
+}
+
+# Refit exclussive lasso on new lambda grid
+# Used internally by predict(exact=TRUE)
+#' @importFrom utils modifyList
+update_fit <- function(object, lambda, ...){
+    ARGS <- list(X=object$X,
+                 y=object$y,
+                 groups=object$groups,
+                 weights=object$weights,
+                 offset=object$offset,
+                 family=object$gamily,
+                 standardize=object$standardize,
+                 intercept=has_intercept(object),
+                 lambda=lambda)
+
+    ARGS <- modifyList(ARGS, list(...))
+
+    do.call(exclusive_lasso, ARGS)
+}
+
+#' @rdname predict.ExclusiveLassoFit
+#' @export
+#' @importFrom stats predict
+coef.ExclusiveLassoFit <- function(object, lambda=s, s=NULL, exact=FALSE, ...){
+    predict(object, lambda=lambda, type="coefficients", exact=exact, ...)
+}
+
+#' Make predictions using the exclusive lasso.
+#'
+#' Make predictions using the exclusive lasso. Similar to \code{\link[glmnet]{predict.glmnet}}.
+#' \code{coef(...)} is a wrapper around \code{predict(..., type="coefficients")}.
+#'
+#' @rdname predict.ExclusiveLassoFit
+#' @export
+#' @param object An \code{ExclusiveLassoFit} object produced by \code{\link{exclusive_lasso}}.
+#' @param newx New data \eqn{X \in R^{m \times p}}{X} on which to make predictions. If not
+#'    supplied, predictions are made on trainng data.
+#' @param s An alternate argument that may be used to supply \code{lambda}. Included for
+#'    compatability with \code{\link[glmnet]{glmnet}}.
+#' @param lambda The value of the regularization paramter (\eqn{lambda}) at which to
+#'    return the fitted coefficients or predicted values. If not supplied, results for
+#'    the entire regularization path are returned. Can be a vector.
+#' @param type The type of "prediction" to return. If \code{type="link"}, returns
+#'    the linear predictor. If \code{type="response"}, returns the expected
+#'    value of the response. If \code{type="coefficients"}, returns the coefficients
+#'    used to calculate the linear predictor. (Cf. the \code{type} argument
+#'    of \code{\link[glmnet]{predict.glmnet}})
+#' @param exact Should the exclusive lasso be re-run for provided values of \code{lambda}?
+#'    If \code{FALSE}, approximate values obtained by linear interpolation on grid points
+#'    are used instead. (Cf. the \code{exact} argument of \code{\link[glmnet]{predict.glmnet}})
+#' @param offset An offset term used in predictions. If not supplied, all offets are
+#'    taken to be zero. If the original fit was made with an offset, \code{offset} will
+#'    be required.
+#' @param ... Additional arguments passed to \code{\link{exclusive_lasso}} if
+#'    \code{exact=TRUE} and ignored otherwise.
+#' @examples
+#' n <- 200
+#' p <- 500
+#' groups <- rep(1:10, times=50)
+#' beta <- numeric(p);
+#' beta[1:10] <- 3
+#'
+#' X <- matrix(rnorm(n * p), ncol=p)
+#' y <- X %*% beta + rnorm(n)
+#'
+#' exfit <- exclusive_lasso(X, y, groups)
+#' coef(exfit, lambda=1)
+#' predict(exfit, lambda=1, newx = -X)
+predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
+                                      type=c("link", "response", "coefficients"),
+                                      exact=FALSE, offset, ...){
+    type <- match.arg(type)
+
+    ## Get coefficients first
+    if(!is.null(lambda)){
+        if(exact){
+            object <- update_fit(object, lambda=lambda, ...)
+
+            if(has_intercept(object)){
+               int <- Matrix(object$intercept, nrow=1,
+                             sparse=TRUE, dimnames=list("(Intercept)", NULL))
+            } else {
+                int <- Matrix(0, nrow=1, ncol=length(object$lambda),
+                              sparse=TRUE, dimnames=list("(Intercept)", NULL))
+            }
+
+            coef <- rbind(int, object$coef)
+        } else {
+            if(has_intercept(object)){
+               int <- Matrix(object$intercept, nrow=1,
+                             sparse=TRUE, dimnames=list("(Intercept)", NULL))
+            } else {
+                int <- Matrix(0, nrow=1, ncol=length(object$lambda),
+                              sparse=TRUE, dimnames=list("(Intercept)", NULL))
+            }
+
+            coef <- rbind(int, object$coef)
+            lambda <- clamp(lambda, range=range(object$lambda))
+
+            coef <- lambda_interp(coef,
+                                  old_lambda=object$lambda,
+                                  new_lambda=lambda)
+        }
+    } else {
+        if(has_intercept(object)){
+               int <- Matrix(object$intercept, nrow=1,
+                             sparse=TRUE, dimnames=list("(Intercept)", NULL))
+            } else {
+                int <- Matrix(0, nrow=1, ncol=length(object$lambda),
+                              sparse=TRUE, dimnames=list("(Intercept)", NULL))
+            }
+
+        coef <- rbind(int, object$coef)
+    }
+
+    if(type == "coefficients"){
+        return(coef) ## Done
+    }
+
+    if(missing(newx)){
+        link <- object$offset + cbind(1, object$X) %*% coef
+    } else {
+        if(missing(offset)){
+            if(has_offset(object)){
+                stop("Original fit had an offset term but", sQuote("offset"), "not supplied.")
+            } else {
+                offset <- rep(0, NROW(newx))
+            }
+        }
+        link <- offset + cbind(1, newx) %*% coef
+    }
+
+    link <- as.matrix(link)
+
+    if(type == "link"){
+        link
+    } else {
+        ## Returning response
+        switch(object$family,
+           gaussian=link,
+           binomial=inv_logit(link),
+           poisson=exp(link))
+    }
 }

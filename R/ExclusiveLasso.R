@@ -202,24 +202,24 @@ has_offset <- function(x){
 }
 
 #' @export
-print.ExclusiveLassoFit <- function(x, ...){
-    cat("Exclusive Lasso Fit", "\n")
-    cat("-------------------", "\n")
-    cat("\n")
-    cat("N: ", NROW(x$X), ". P: ", NCOL(x$X), ".\n", sep="")
-    cat(length(unique(x$groups)), "groups. Median size", median(table(x$groups)), "\n")
-    cat("\n")
-    cat("Grid:", length(x$lambda), "values of lambda. \n")
-    cat("  Miniumum:", min(x$lambda), "\n")
-    cat("  Maximum: ", max(x$lambda), "\n")
-    cat("\n")
-    cat("Fit Options:\n")
-    cat("  - Family:        ", capitalize_string(x$family), "\n")
-    cat("  - Intercept:     ", has_intercept(x), "\n")
-    cat("  - Standardize X: ", x$standardize, "\n")
-    cat("\n")
-    cat("Time: ", sprintf("%2.3f %s", x$time, attr(x$time, "units")), "\n")
-    cat("\n")
+print.ExclusiveLassoFit <- function(x, ..., indent=0){
+    icat("Exclusive Lasso Fit", "\n", indent=indent)
+    icat("-------------------", "\n", indent=indent)
+    icat("\n", indent=indent)
+    icat("N: ", NROW(x$X), ". P: ", NCOL(x$X), ".\n", sep="", indent=indent)
+    icat(length(unique(x$groups)), "groups. Median size", median(table(x$groups)), "\n", indent=indent)
+    icat("\n", indent=indent)
+    icat("Grid:", length(x$lambda), "values of lambda. \n", indent=indent)
+    icat("  Miniumum:", min(x$lambda), "\n", indent=indent)
+    icat("  Maximum: ", max(x$lambda), "\n", indent=indent)
+    icat("\n", indent=indent)
+    icat("Fit Options:\n", indent=indent)
+    icat("  - Family:        ", capitalize_string(x$family), "\n", indent=indent)
+    icat("  - Intercept:     ", has_intercept(x), "\n", indent=indent)
+    icat("  - Standardize X: ", x$standardize, "\n", indent=indent)
+    icat("\n", indent=indent)
+    icat("Time: ", sprintf("%2.3f %s", x$time, attr(x$time, "units")), "\n", indent=indent)
+    icat("\n", indent=indent)
 
     invisible(x)
 }

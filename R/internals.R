@@ -44,3 +44,10 @@ lambda_interp <- function(x, old_lambda, new_lambda){
 
 #' @importFrom stats predict
 inv_logit <- function(x) plogis(x)
+
+icat <- function(..., indent=0){
+    if(indent){
+        cat(rep(" ", indent), sep="")
+    }
+    cat(...)
+}

@@ -2,6 +2,8 @@
 #'
 #' @importMethodsFrom Matrix colSums
 #' @importFrom RColorBrewer brewer.pal
+#' @importFrom graphics plot lines text legend
+#' @importFrom stats runif
 #' @export
 #' @param x An \code{ExclusiveLassoFit} object produced by \code{\link{exclusive_lasso}}
 #' @param xvar Value to use on the x-axis (ordinate). \itemize{
@@ -98,4 +100,37 @@ plot.ExclusiveLassoFit <- function(x, xvar=c("norm", "lambda", "l1"),
 
 el_norm <- function(x, g){
     sum(tapply(x, g, function(x) sum(abs(x)))^2)
+}
+
+#' @param x An \code{ExclusiveLassoFit_cv} object as produced by
+#'    \code{\link{cv.exclusive_lasso}}.
+#' @param bar.width Width of error bars
+#' @export
+#' @rdname cv.exclusive_lasso
+#' @importFrom graphics segments points abline
+plot.ExclusiveLassoFit_cv <- function(x, bar.width=0.01, ...){
+
+    log_lambda <- log(x$lambda)
+    bar.width <- bar.width * diff(range(log_lambda))
+
+    plot(log_lambda, x$cvm,
+         ylim=range(c(x$cvup, x$cvlo)),
+         xlab=expression(log(lambda)),
+         ylab=toupper(x$name),
+         type="n", ...)
+
+    points(log_lambda, x$cvm, pch=20, col="red")
+
+    segments(log_lambda, x$cvlo,
+             log_lambda, x$cvup,
+             col="darkgrey")
+    segments(log_lambda - bar.width, x$cvlo,
+             log_lambda + bar.width, x$cvlo,
+             col="darkgrey")
+    segments(log_lambda - bar.width, x$cvup,
+             log_lambda + bar.width, x$cvup,
+             col="darkgrey")
+
+    abline(v=log(x$lambda.min), lty=3)
+    abline(v=log(x$lambda.1se), lty=3)
 }

@@ -34,7 +34,7 @@
 #' coef(exfit_cv, lambda="lambda.1se")
 cv.exclusive_lasso <- function(X, y, groups, ...,
                                type.measure=c("mse", "deviance", "class", "auc", "mae"),
-                               nfolds=10, parallel=TRUE){
+                               nfolds=10, parallel=FALSE){
 
     tic <- Sys.time()
 

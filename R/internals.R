@@ -51,3 +51,7 @@ icat <- function(..., indent=0){
     }
     cat(...)
 }
+
+logspace <- function(x, y, length.out){
+    exp(seq(log(x), log(y), length.out=length.out))
+}

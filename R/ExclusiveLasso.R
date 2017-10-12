@@ -34,7 +34,7 @@
 #' @param lambda.min.ratio The smallest value of lambda to be used, as a fraction
 #'      of the largest value of lambda used. Unlike the lasso, there is no
 #'      value of lambda such that the solution is wholly sparse, but we still
-#'      use lambda_max from the lasso
+#'      use lambda_max from the lasso. 
 #' @param lambda A user-specified sequence of lambdas to use.
 #' @param standardize Should \code{X} be centered and scaled before fitting?
 #' @param intercept Should the fitted model have an (unpenalized) intercept term?
@@ -139,7 +139,7 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
 
     if(missing(lambda)){
         lambda_max <- max(abs(crossprod(X, y - offset - weighted.mean(y, weights) * intercept)/nobs))
-        lambda <- seq(lambda.min.ratio * lambda_max, lambda_max, length.out=nlambda)
+        lambda <- logspace(lambda.min.ratio * lambda_max, lambda_max, length.out=nlambda)
     }
 
     if(length(lambda) < 1){

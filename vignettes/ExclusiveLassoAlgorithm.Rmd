@@ -17,11 +17,18 @@ knitr::opts_chunk$set(cache=TRUE)
 \[
 \DeclareMathOperator{\argmin}{arg\,min}
 \DeclareMathOperator{\sign}{sign}
+\DeclareMathOperator{\trace}{Trace}
 \newcommand{\bI}{\mathbf{I}}
+\newcommand{\bM}{\mathbf{M}}
+\newcommand{\bo}{\mathbf{o}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\bv}{\mathbf{v}}
+\newcommand{\bu}{\mathbf{u}}
 \newcommand{\bx}{\mathbf{x}}
 \newcommand{\bX}{\mathbf{X}}
 \newcommand{\by}{\mathbf{y}}
 \newcommand{\bz}{\mathbf{z}}
+\newcommand{\bW}{\mathbf{W}}
 \DeclareMathOperator{\prox}{\textsf{prox}}
 \]
 
@@ -92,8 +99,8 @@ Unlike the standard $\ell_1$-penalization case, this proximal operator cannot be
 evaluated in closed form and an iterative algorithm must be used to approximate the
 proximal operator. This gives rise to a so-called *inexact proximal gradient* scheme,
 convergence conditions of which were analyzed by Schmidt *et al.* [-@Schmidt:2011].
-Campbell and Allen propose the use of a coordinate-descent scheme to evaluate
-the proximal operator, described in more detail below.
+Campbell and Allen [-@Campbell:2017] propose the use of a coordinate-descent
+scheme to evaluate the proximal operator, described in more detail below.
 
 ### Evaluation of the Proximal Operator
 
@@ -101,9 +108,9 @@ We wish to evaluate the proximal operator:
 \[\argmin_{x} \frac{1}{2}\|x - z\|_2^2 + \frac{c}{2}\sum_{g \in \mathcal{G}} \|x_g\|_1^2\]
 Note that we fold the constant terms into a single term $c$ in this subsection.
 
-Campbell and Allen propose the use of coordinate descent [@Shi:2016] for this
-problem and show that it converges, using the sufficient conditions of
-[@Tseng:2001].
+Campbell and Allen [-@Campbell:2017] propose the use of coordinate descent
+[@Shi:2016] for this problem and show that it converges, using the sufficient
+conditions of Tseng [-@Tseng:2001].
 
 We first note that the proximal operator can be split according to the group structure:[^1]
 \[\frac{1}{2}\|x - z\|_2^2 + \frac{c}{2}\sum_{g \in \mathcal{G}} \|x_g\|_1^2 = \sum_{g \in \mathcal{G}} \frac{1}{2}\|x_g - z_g\|_2^2 + \frac{c}{2}\|x_g\|_1^2 \]
@@ -123,7 +130,7 @@ Re-grouping and adjusting constant terms, this becomes:
 \implies &\argmin_{x_1} \frac{c}{1+c} \|x_{-1}\|_1 * |x_1| + \frac{1}{2}\left(x_1 - \frac{1}{1+c}z_1\right)^2
 \end{align*}\]
 which we recognize as the proximal operator of the scaled absolute value function
-\[f(y) = \frac{c}{1+c}\|x_{-1}|_1 * |y|\] evaluated at $\frac{z_1}{1+c}$
+\[f(y) = \frac{c}{1+c}\|x_{-1}\|_1 * |y|\] evaluated at $\frac{z_1}{1+c}$
 giving the coordinate update:
 \[x_i \leftarrow \mathcal{S}_{\frac{c}{1 + c} \|x^{-i}\|}\left(\frac{1}{1 + c} z_i\right)\]
 
@@ -148,11 +155,113 @@ for $\eqref{eq:el-gaussian}$.
     - $\beta^{(k)} = x$
     - $k := k + 1$.
 
+Generalizing slightly, if we have a vector of offsets $\bo$ and a (diagonal) weight
+matrix $\bW$, the combined algorithm becomes:
+
+1. Initialize
+    - $\beta^{(0)} = 0$
+    - $t = \lambda_{\text{max}}(\bX^T\bW\bX/n)^{-1}$
+    - $k = 1$
+2. Repeat Until Convergence:
+    - $\bz^{(k-1)} = (\bI + t \bX^T\bW\bX/n)\beta^{(k-1)} - t \bX^T\bW(\by-\bo)/n$
+    - For each group $g \in \mathcal{G}$:
+        - Initialize $x_g = 0$
+        - Repeat until convergence, looping over each $i \in g$:
+          \[x_{g, i} = \mathcal{S}_{\frac{2t\lambda}{1 + t\lambda}\|x_{g, -i}\|_1}\left(\frac{t\lambda}{1+t\lambda} z_{g, i}\right)\]
+    - $\beta^{(k)} = x$
+    - $k := k + 1$.
+
+### Coordinate Descent
+
+Campbell and Allen [-@Campbell:2017] also propose using a coordinate descent
+algorithm to solve $\eqref{eq:el-gaussian}$ directly, similar to that used by
+Friedman *et al.* in the `glmnet` package [-@Friedman:2007; -@Friedman:2010]
+and by Wu and Lange [-@Wu:2008], among several others, for lasso regression.
+As with the proximal operator, this is slightly more complicated because
+the penalty term is non-separable, but they show that coordinate descent
+converges for the general problem (of which the proximal operator is a special
+case), again using the analysis of Tseng [-@Tseng:2001].
+
+Coordinate descent works by sequentially selecting one variable to update and
+fixing all others temporarily, minimizing the objective as a function of the
+selected variable, and cycling through all variables until convergence. In spite
+of its simple structure, many variations of coordinate descent are possible, depending
+on how the internal minimization is solved, the strategy by which the active
+is chosen, *etc.* Shi *et al.* [-@Shi:2016] review a number of variants. In the
+case of sparse regression, significant speed-ups can also be obtained by use of an
+"active-set" strategy, where non-zero variables are updated more frequently
+than zero variables. For now, we are content with a simple approach where
+all variables are checked sequentially, regardless of whether they are zero or not.
+
+The coordinate updates for the general problem generalize those used
+in the proximal operator. Suppose we wish to update $\beta_i$ where $i \in g$.
+Then we solve:
+\[\argmin_{\beta_i} \frac{1}{2n} \|\by - \bX_{-i}\beta_{-i} - \bx_i\beta_i\|_2^2 + \frac{\lambda}{2}\sum_{g \in \mathcal{G}} \|\beta_g\|_1^2\]
+We let $\br = \by - \bX_{-i}\beta_{-i}$ be the "working residual" and omit
+penalty terms that do not have $\beta_i$ in them:
+\[\argmin_{\beta_i} \frac{1}{2n} \|\br - \bx_i\beta_i\|_2^2 + \frac{\lambda}{2}\left(|\beta_i| + \|\beta_{g,-i}\|_1\right)^2\]
+Using similar algebra as before:
+\[\begin{align*}
+&\argmin_{\beta_i} \frac{1}{2n} \|\br - \bx_i\beta_i\|_2^2 + \frac{\lambda}{2}\left(|\beta_i| + \|\beta_{g,-i}\|_1\right)^2 \\
+\implies & \argmin_{\beta_i} \frac{1}{2} \|\br - \bx_i\beta_i\|_2^2 + \frac{n\lambda}{2}\left(|\beta_i| + \|\beta_{g,-i}\|_1\right)^2 \\
+\implies & \argmin_{\beta_i} \frac{\|\br\|_2^2 - 2\br^T\bx_i\beta_i + \|\bx_i\|_2^2\beta_i^2 + n\lambda(\beta_i^2 + 2|\beta_i| * \|\beta_{g,-i}\|_1 + \|\beta_{g,-i}\|_1^2}{2} \\
+\implies & \argmin_{\beta_i} \frac{\beta_i^2 (\|\bx_i\|_2^2 + n\lambda) - 2\br^T\bx_i\beta_i + 2n\lambda |\beta_i| * \|\beta_{g, -i}\|_1}{2} \\
+\implies & \argmin_{\beta_i} n\lambda\|\beta_{g,-i}\|_1 * |\beta_i| +\frac{1}{2}\left(\beta_i^2 (\|\bx_i\|_2^2 + n\lambda) - 2\br^T\bx_i\beta_i \right) \\
+\implies & \argmin_{\beta_i} \frac{n\lambda\|\beta_{g,-i}\|_1}{\|\bx_i\|_2^2 + n\lambda} * |\beta_i| +\frac{1}{2(\|\bx_i\|_2^2 + n\lambda)}\left(\beta_i^2 (\|\bx_i\|_2^2 + n\lambda) - 2\br^T\bx_i\beta_i \right) \\
+\implies & \argmin_{\beta_i} \frac{n\lambda\|\beta_{g-i}\|_1}{\|\bx_i\|_2^2 + n\lambda} * |\beta_i| +\frac{1}{2}\left(\beta_i^2 - 2\frac{\br^T\bx_i}{(\|\bx_i\|_2^2 + n\lambda)}\beta_i \right) \\
+\implies & \argmin_{\beta_i} \frac{n\lambda\|\beta_{g,-i}\|_1}{\|\bx_i\|_2^2 + n\lambda} * |\beta_i| +\frac{1}{2}\left(\beta_i - \frac{\br^T\bx_i}{(\|\bx_i\|_2^2 + n\lambda)} \right)^2 \\
+\end{align*}\]
+which we recognize as the proximal operator of the scaled absolute value function
+\[f(y) = \frac{n\lambda\|\beta_{g-i}\|_1}{\|\bx_i\|_2^2 + n\lambda} * |y|\]
+evaluated at $\frac{\br^T\bx_i}{\|\bx_i\|_2^2 + n\lambda}$, which gives the
+coordinate update:
+\[\beta_i \leftarrow \mathcal{S}_{\frac{n\lambda\|\beta_{g,-i}\|_1}{\|\bx_i\|_2^2 + n\lambda}}\left(\frac{\br^T\bx_i}{\|\bx_i\|_2^2 + n\lambda}\right)\]
+Factoring out the common denominator, we get:
+\[\beta_i \leftarrow \frac{1}{\|\bx_i\|_2^2 + n\lambda}\mathcal{S}_{n\lambda\|\beta_{g,-i}\|_1}\left(\br^T\bx_i\right)\]
+
+Hence the coordinate descent algorithm is given by:
+
+1. Initialize
+    - $\beta = 0$
+    - $k = 1$
+    - $\br = \by - \bX\beta = \by$
+2. Precompute:
+    - $\bu$ where $u_i = \bx_i^T\bx_i$
+3. Repeat Until Convergence:
+    - For $i \in [p]$:
+        - Update working residual: $\br := \br + \bX_i\beta_i$
+        - Set $z = \br^T\bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g,-i}\|_1$
+        - Update:
+            \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(z)\]
+        - Update working residual: $\br := \br - \bX_i\beta_i$
+
+In practice, when solving along a grid of values of $\lambda$, convergence can
+be much improved by "warm-starting" $\beta^{(0)}$ at the solution for
+a nearby value of $\lambda$.
+
+For the general case with offsets $\bo$ and a (diagonal) weight
+matrix $\bW$, the combined algorithm becomes:
+
+1. Initialize
+    - $\beta = 0$
+    - $k = 1$
+    - $\br = \by - \bo - \bX\beta = \by - \bo$
+2. Precompute:
+    - $\bu = \text{diag}(\bX^T\bW\bX)$
+3. Repeat Until Convergence:
+    - For $i \in [p]$:
+        - Update working residual: $\br := \br + \bX_i\beta_i$
+        - Set $z = \br^T\bW\bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g,-i}\|_1$
+        - Update:
+            \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(z)\]
+        - Update working residual: $\br := \br - \bX_i\beta_i$
+
 ## Stationary Conditions
 
 In this section, we derive and re-state some of the stationarity conditions
-from Campbell and Allen with the scaling conventions used by the `ExclusiveLasso`
-package. Many of these are used internally to test the correctness of the package.
+from Campbell and Allen [-@Campbell:2017] with the scaling conventions used by
+the `ExclusiveLasso` package. Many of these are used internally to test the
+correctness of the package.
 
 We first derive the subdifferential of the penalty:
 \[P(\beta) = \sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}\]
@@ -207,9 +316,9 @@ For the general problem, the KKT conditions are given by:
 \[0 \in -\bX^T(\by - \bX\beta) + \lambda \partial P(\beta)\]
 
 Restricting attention to the (estimated) support $\hat{\beta}_{\hat{S}}$,
-Campbell and Allen (2017, Proposition 1) show that $\hat{\beta}_{\hat{S}}$ has
+Campbell and Allen [-@Campbell:2017, Proposition 1] show that $\hat{\beta}_{\hat{S}}$ has
 a closed-form solution, conditional on the signed support, given by
-\[\hat{\beta}_{\hat{S}} = (\bX_{\hat{S}}^T\bX_{\hat{S}}/n + \lambda \bM_\hat{S})^{\dagger}\bX_{hat{S}}^T\by/n\]
+\[\hat{\beta}_{\hat{S}} = (\bX_{\hat{S}}^T\bX_{\hat{S}}/n + \lambda \bM_\hat{S})^{\dagger}\bX_{\hat{S}}^T\by/n\]
 where $\bM_{\hat{S}}$ is a block-diagonal matrix[^2] with blocks given by
 $\text{sign}(\hat{\beta}_{\hat{S} \cap g})\text{sign}(\hat{\beta}_{\hat{S} \cap g})^T$.
 Note that we have an additional factor of $1/n$ due to the extra $n^{-1}$ in

@@ -15,90 +15,90 @@ test_that("Input validation works", {
     offset <- runif(n, -0.5, 0.5);
 
     lambda <- seq(0.5, 5, length.out=100)
-    thresh_pg <- 1e-2; thresh_prox <- 1e-2 ## Low values here speed up tests
+    thresh <- 1e-2; thresh_prox <- 1e-2 ## Low values here speed up tests
 
     expect_silent(exclusive_lasso(X, y, groups=groups,
                                   weights=weights, offset=offset,
                                   lambda=lambda, family="gaussian",
-                                  thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                  thresh=thresh, thresh_prox=thresh_prox))
 
     ## X, y match
     expect_error(exclusive_lasso(X, rep(y, 2), groups=groups,
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
 
     expect_error(exclusive_lasso(X, rep(y, length.out=n-1), groups=groups,
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
 
     ## groups check
     expect_error(exclusive_lasso(X, y,
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=rep(groups, 2),
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
 
     ## Weights check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=rep(weights, 3), offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                   weights= -1 * weights, offset=offset,
                                   lambda=lambda, family="gaussian",
-                                  thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights= 0 * weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_warning(exclusive_lasso(X, y, groups=groups,
                                  weights= 2 * weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
 
     ## Offsets check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=rep(offset, 2),
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
 
     ## Convergence thresholds check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=-1 * thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=-1 * thresh, thresh_prox=thresh_prox))
 
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=-1 * thresh_prox))
+                                 thresh=thresh, thresh_prox=-1 * thresh_prox))
 
     ## Lambda check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
                                  nlambda=-30, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
                                  nlambda=0, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
                                  lambda=-lambda, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
                                  lambda.min.ratio=2, family="gaussian",
-                                 thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                 thresh=thresh, thresh_prox=thresh_prox))
     expect_warning(exclusive_lasso(X, y, groups=groups,
                                    weights=weights, offset=offset,
                                    lambda=rev(lambda), family="gaussian",
-                                   thresh_pg=thresh_pg, thresh_prox=thresh_prox))
+                                   thresh=thresh, thresh_prox=thresh_prox))
 
 })
 
@@ -114,7 +114,7 @@ test_that("Dynamic defaults work", {
     groups <- rep(1:g, length.out=p)
 
     elfit <- exclusive_lasso(X, y, groups,
-                             thresh_prox=1e-2, thresh_pg=1e-2)
+                             thresh_prox=1e-2, thresh=1e-2)
 
     expect_true(all(elfit$weights == 1))
     expect_true(all(elfit$offset == 0))
@@ -140,7 +140,7 @@ test_that("Preserves column names", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              thresh_prox=1e-2,
-                             thresh_pg=1e-2)
+                             thresh=1e-2)
 
     expect_equal(rownames(elfit$coef),
                  colnames(X))
@@ -166,12 +166,12 @@ test_that("Standardization works", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              thresh_prox=1e-8,
-                             thresh_pg=1e-8)
+                             thresh=1e-8)
 
     elfit_sc <- exclusive_lasso(X_sc, y, groups, lambda=elfit$lambda,
                                 standardize=FALSE,
                                 thresh_prox=1e-8,
-                                thresh_pg=1e-8)
+                                thresh=1e-8)
 
     expect_equal(elfit$intercept, elfit_sc$intercept)
     expect_equal(scale(elfit$X), elfit_sc$X, check.attributes=FALSE)
@@ -226,7 +226,7 @@ test_that("Returns ridge with trivial group structure", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     for(i in seq_len(nlambda)){
         expect_equal(solve(crossprod(X)/n + elfit$lambda[i] * diag(1, p, p),
@@ -250,7 +250,7 @@ test_that("Returns ridge with trivial group structure", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     for(i in seq_len(nlambda)){
         expect_equal(solve(crossprod(X)/n + elfit$lambda[i] * diag(1, p, p),
@@ -307,7 +307,7 @@ test_that("Matches closed form solution", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     for(i in seq_len(nlambda)){
         beta_hat <- elfit$coef[, i]
@@ -338,7 +338,7 @@ test_that("Matches closed form solution", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     for(i in seq_len(nlambda)){
         beta_hat <- elfit$coef[, i]
@@ -352,4 +352,56 @@ test_that("Matches closed form solution", {
 
         expect_equal(as.vector(beta_analytic), beta_hat[supp])
     }
+})
+
+test_that("Two algorithms give the same result",{
+    set.seed(1559)
+    n <- 200
+    p <- 500
+
+    g <- 50
+    groups <- rep(1:p, length.out=p)
+
+    ## Basic case
+    X <- matrix(rnorm(n * p), ncol=p)
+    beta <- numeric(p); beta[1:g] <- 2 * sample(c(-1, 1), g, replace=TRUE)
+
+    y <- X %*% beta + rnorm(n)
+
+    f1 <- exclusive_lasso(X, y, groups, algorithm="cd", thresh=1e-12)
+    f2 <- exclusive_lasso(X, y, groups, algorithm="pg", thresh=1e-12, thresh_prox=1e-12)
+
+    expect_equal(coef(f1), coef(f2))
+
+    ## + Offsets
+    o <- runif(n, -0.5, 0.5)
+    y <- X %*% beta + o + rnorm(n)
+
+    f1 <- exclusive_lasso(X, y, groups, offset=o,
+                          algorithm="cd", thresh=1e-12)
+    f2 <- exclusive_lasso(X, y, groups, offset=o,
+                          algorithm="pg", thresh=1e-12, thresh_prox=1e-12)
+
+    expect_equal(coef(f1), coef(f2))
+
+    ## + Weights
+    w <- runif(n, 1, 2); w <- n * w / sum(w)
+    y <- X %*% beta + o + rnorm(n)
+
+    f1 <- exclusive_lasso(X, y, groups, weights=w,
+                          algorithm="cd", thresh=1e-12)
+    f2 <- exclusive_lasso(X, y, groups, weights=w,
+                          algorithm="pg", thresh=1e-12, thresh_prox=1e-12)
+
+    expect_equal(coef(f1), coef(f2))
+
+    ## Speed up test => use fewer lambda values
+    ##
+    ## We need to use very high precision to get the values to match,
+    ## so check fewer lambdas to get this done in a reasonable amount of time
+    f <- exclusive_lasso(X, y, groups, weights=w, nlambda=10,
+                         algorithm="cd", thresh=1e-14)
+    f2 <- exclusive_lasso(X, y, groups, weights=w, nlambda=10,
+                         thresh=1e-14, thresh_prox=1e-14, algorithm="pg")
+    expect_equal(coef(f), coef(f2))
 })

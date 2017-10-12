@@ -17,7 +17,7 @@ test_that("coef() works with original lambda", {
     ## With intercept
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=TRUE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     c_elfit <- coef(elfit)
     expect_equal(NROW(c_elfit), p + 1)
@@ -30,7 +30,7 @@ test_that("coef() works with original lambda", {
     ## Repeat without intercept
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     c_elfit <- coef(elfit)
     expect_equal(NROW(c_elfit), p + 1)
@@ -57,7 +57,7 @@ test_that("coef() works with new lambda (exact=FALSE)", {
     ## With intercept
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=TRUE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     ### Truly new value
     c_elfit <- coef(elfit, lambda=mean(elfit$lambda[23:24]))
@@ -94,7 +94,7 @@ test_that("coef() works with new lambda (exact=TRUE)", {
     ## Without intercept
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     ### Truly new value
     c_elfit <- coef(elfit, lambda=mean(elfit$lambda[23:24]),
@@ -107,17 +107,17 @@ test_that("coef() works with new lambda (exact=TRUE)", {
 
     ### Old min endpoint
     c_elfit <- coef(elfit, lambda=min(elfit$lambda),
-                    exact=TRUE, thresh_pg=1e-14, thresh_prox=1e-14)
+                    exact=TRUE, thresh=1e-14, thresh_prox=1e-14)
     expect_equal(c_elfit[-1], elfit$coef[,1], check.attributes=FALSE)
 
     ### Old max endpoint
     c_elfit <- coef(elfit, lambda=max(elfit$lambda),
-                    exact=TRUE, thresh_pg=1e-14, thresh_prox=1e-14)
+                    exact=TRUE, thresh=1e-14, thresh_prox=1e-14)
     expect_equal(c_elfit[-1], elfit$coef[,nlambda], check.attributes=FALSE)
 
     ### Exact match to old internal value
     c_elfit <- coef(elfit, lambda=elfit$lambda[15],
-                    exact=TRUE, thresh_pg=1e-14, thresh_prox=1e-14)
+                    exact=TRUE, thresh=1e-14, thresh_prox=1e-14)
     expect_equal(c_elfit[-1], elfit$coef[,15], check.attributes=FALSE)
 
 })
@@ -138,7 +138,7 @@ test_that("predict() works -- training data", {
     ## With intercept
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=TRUE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     expect_equal(predict(elfit, lambda=1),
                  cbind(1, X) %*% as.matrix(coef(elfit, lambda=1)),
@@ -156,7 +156,7 @@ test_that("predict() works -- training data", {
     o <- runif(n, 0.5, 1.5)
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, offset=o,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     expect_equal(predict(elfit, lambda=1),
                  X %*% as.matrix(coef(elfit, lambda=1))[-1,] + o,
@@ -187,7 +187,7 @@ test_that("predict() works -- test data", {
     ## With intercept
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=TRUE, standardize=FALSE,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     expect_equal(predict(elfit, newx=X2, lambda=1),
                  cbind(1, X2) %*% as.matrix(coef(elfit, lambda=1)),
@@ -205,7 +205,7 @@ test_that("predict() works -- test data", {
     o <- runif(n, 0.5, 1.5)
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, offset=o,
-                             thresh_pg=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14)
 
     expect_equal(predict(elfit, lambda=1, newx=X2, offset=o),
                  X2 %*% as.matrix(coef(elfit, lambda=1))[-1,] + o,

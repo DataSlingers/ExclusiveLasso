@@ -38,11 +38,16 @@
 #' @param lambda A user-specified sequence of lambdas to use.
 #' @param standardize Should \code{X} be centered and scaled before fitting?
 #' @param intercept Should the fitted model have an (unpenalized) intercept term?
+#' @param thresh The convergence threshold used for the proximal
+#'    gradient or coordinate-descent algorithm used to solve the
+#'    penalized regression problem.
 #' @param thresh_prox The convergence threshold used for the
 #'    coordinate-descent algorithm used to evaluate the proximal operator.
-#' @param thresh_pg The convergence threshold used for the proximal
-#'    gradient algorithm used to solve the penalized regression problem.
-#'
+#' @param algorithm Which algorithm to use, proximal gradient (\code{"pg"}) or
+#'    coordinate descent (\code{"cd"})? Empirically, coordinate descent appears
+#'    to be faster for most problems (consistent with Campbell and Allen), but
+#'    proximal gradient may be faster for certain problems with many small groups
+#'    where the proximal operator may be evaluated quickly and to high precision.
 #' @examples
 #' n <- 200
 #' p <- 500
@@ -56,12 +61,16 @@
 #' exfit <- exclusive_lasso(X, y, groups)
 #' @importFrom stats median weighted.mean
 #' @importFrom Matrix Matrix
+#' @references
+#' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
+#'     with the Exclusive Lasso". Electronic Journal of Statistics (to appear).
 #' @export
 exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "poisson"),
                             weights, offset, nlambda=100,
                             lambda.min.ratio=ifelse(nobs < nvars, 0.01, 1e-04),
-                            lambda, standardize=TRUE,
-                            intercept=TRUE, thresh_prox=1e-07, thresh_pg=1e-07){
+                            lambda, standardize=TRUE, intercept=TRUE,
+                            thresh=1e-07, thresh_prox=thresh,
+                            algorithm=c("cd", "pg")){
 
     tic <- Sys.time()
 
@@ -150,13 +159,21 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         stop(sQuote("thresh_prox"), " must be positive.")
     }
 
-    if(thresh_pg <= 0){
-        stop(sQuote("thresh_pg"), " must be positive.")
+    if(thresh <= 0){
+        stop(sQuote("thresh"), " must be positive.")
     }
 
-    coef <- exclusive_lasso_gaussian(X=Xsc, y=y, groups=groups,
-                                     lambda=lambda, w=weights, o=offset,
-                                     thresh_prox=thresh_prox, thresh_pg=thresh_pg)
+    algorithm <- match.arg(algorithm)
+
+    if(algorithm == "cd"){
+        coef <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
+                                           lambda=lambda, w=weights, o=offset,
+                                           thresh=thresh)
+    } else {
+        coef <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
+                                            lambda=lambda, w=weights, o=offset,
+                                            thresh_prox=thresh_prox, thresh=thresh)
+    }
 
     coef <- Matrix(coef, sparse=TRUE)
 

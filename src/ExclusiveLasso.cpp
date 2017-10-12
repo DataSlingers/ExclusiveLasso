@@ -2,6 +2,7 @@
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE 20
 #define EXLASSO_MAX_ITERATIONS_PROX 100
 #define EXLASSO_MAX_ITERATIONS_PG 100000
+#define EXLASSO_MAX_ITERATIONS_CD 100000
 
 // We only include RcppArmadillo.h which pulls Rcpp.h in for us
 #include "RcppArmadillo.h"
@@ -55,10 +56,10 @@ arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
 }
 
 // [[Rcpp::export]]
-arma:: mat exclusive_lasso_gaussian(const arma::mat& X, const arma::vec& y,
-                                    const arma::ivec& groups, const arma::vec& lambda,
-                                    const arma::vec& w, const arma::vec& o,
-                                    double thresh_pg=1e-7, double thresh_prox=1e-7){
+arma:: mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
+                                       const arma::ivec& groups, const arma::vec& lambda,
+                                       const arma::vec& w, const arma::vec& o,
+                                       double thresh=1e-7, double thresh_prox=1e-7){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
@@ -96,12 +97,77 @@ arma:: mat exclusive_lasso_gaussian(const arma::mat& X, const arma::vec& y,
                 Rcpp::checkUserInterrupt();
             }
             if(k >= EXLASSO_MAX_ITERATIONS_PG){
-                Rcpp::stop("[ExclusiveLasso::exclusive_lasso_gaussian] Maximum number of iterations reached.");
+                Rcpp::stop("[ExclusiveLasso::exclusive_lasso_gaussian] Maximum number of proximal gradient iterations reached.");
             }
 
-        } while(arma::norm(beta - beta_old) > thresh_pg);
+        } while(arma::norm(beta - beta_old) > thresh);
 
         Beta.col(i) = beta;
+    }
+
+    return Beta;
+}
+
+// [[Rcpp::export]]
+arma:: mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
+                                       const arma::ivec& groups, const arma::vec& lambda,
+                                       const arma::vec& w, const arma::vec& o,
+                                       double thresh=1e-7){
+
+    arma::uword n = X.n_rows;
+    arma::uword p = X.n_cols;
+    arma::uword n_lambda = lambda.n_elem;
+
+    arma::vec r = y - o;
+    arma::vec beta_working(p, arma::fill::zeros);
+    arma::vec u = arma::diagvec(X.t() * arma::diagmat(w) * X);
+
+    arma::mat Beta(p, n_lambda); Beta.fill(NA_REAL);
+
+    // Number of cd iterations -- used to check for interrupts
+    uint k = 0;
+
+    // Iterate from highest to smallest lambda
+    // to take advantage of
+    // warm starts for sparsity
+    for(int i=n_lambda - 1; i >= 0; i--){
+        arma::vec beta_old(p);
+
+        if(i == n_lambda - 1){
+            beta_old.zeros(p);
+        } else {
+            beta_old = Beta.col(i + 1);
+        }
+
+        do {
+            beta_old = beta_working;
+            for(int j=0; j < p; j++){
+
+                arma::vec xj = X.col(j);
+                r += xj * beta_working(j);
+
+                double z = arma::dot(r % w, xj);
+                double lambda_til = n * lambda(i);
+
+                // Identify elements in same group and calculate norm
+                arma::uvec g_ix = find(groups(j) == groups);
+                lambda_til *= (arma::norm(beta_working(g_ix), 1) - fabs(beta_working(j)));
+
+                beta_working(j) = soft_thresh(z, lambda_til) / (u(j) + n * lambda(i));
+                r -= xj * beta_working(j);
+            }
+
+            k++;
+            if((k % EXLASSO_CHECK_USER_INTERRUPT_RATE) == 0){
+                Rcpp::checkUserInterrupt();
+            }
+            if(k >= EXLASSO_MAX_ITERATIONS_CD){
+                Rcpp::stop("[ExclusiveLasso::exclusive_lasso_gaussian] Maximum number of coordinate descent iterations reached.");
+            }
+
+        } while(arma::norm(beta_working - beta_old) > thresh);
+
+        Beta.col(i) = beta_working;
     }
 
     return Beta;

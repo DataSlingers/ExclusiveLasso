@@ -3,6 +3,8 @@
 #define EXLASSO_MAX_ITERATIONS_PROX 100
 #define EXLASSO_MAX_ITERATIONS_PG 100000
 #define EXLASSO_MAX_ITERATIONS_CD 100000
+#define EXLASSO_PREALLOCATION_FACTOR 10
+#define EXLASSO_RESIZE_FACTOR 2
 
 // We only include RcppArmadillo.h which pulls Rcpp.h in for us
 #include "RcppArmadillo.h"
@@ -109,10 +111,10 @@ arma::mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
 }
 
 // [[Rcpp::export]]
-arma::mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
-                                      const arma::ivec& groups, const arma::vec& lambda,
-                                      const arma::vec& w, const arma::vec& o,
-                                      double thresh=1e-7){
+arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
+                                         const arma::ivec& groups, const arma::vec& lambda,
+                                         const arma::vec& w, const arma::vec& o,
+                                         double thresh=1e-7){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
@@ -134,7 +136,12 @@ arma::mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
     // so this is tight, but should be safe generally.
     arma::vec g_norms(arma::max(groups) + 1, arma::fill::zeros);
 
-    arma::mat Beta(p, n_lambda); Beta.fill(NA_REAL);
+    uint beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
+    uint beta_nnz = 0;
+    arma::umat Beta_storage_ind(2, beta_nnz_approx);
+    arma::vec  Beta_storage_vec(beta_nnz_approx);
+
+    arma::vec beta_old(p, arma::fill::zeros);
 
     // Number of cd iterations -- used to check for interrupts
     uint k = 0;
@@ -143,13 +150,7 @@ arma::mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
     // to take advantage of
     // warm starts for sparsity
     for(int i=n_lambda - 1; i >= 0; i--){
-        arma::vec beta_old(p);
-
-        if(i == n_lambda - 1){
-            beta_old.zeros(p);
-        } else {
-            beta_old = Beta.col(i + 1);
-        }
+        double nl = n * lambda(i);
 
         do {
             beta_old = beta_working;
@@ -163,9 +164,9 @@ arma::mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
                 g_norms(g) -= fabs(beta);
 
                 double z = arma::dot(r % w, xj);
-                double lambda_til = n * lambda(i) * g_norms(g);
+                double lambda_til = nl * g_norms(g);
 
-                beta = soft_thresh(z, lambda_til) / (u(j) + n * lambda(i));
+                beta = soft_thresh(z, lambda_til) / (u(j) + nl);
                 r -= xj * beta;
                 g_norms(g) += fabs(beta);
 
@@ -182,8 +183,31 @@ arma::mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
 
         } while(arma::norm(beta_working - beta_old) > thresh);
 
-        Beta.col(i) = beta_working;
+        // Extend sparse matrix storage if needed
+        if(beta_nnz >= Beta_storage_ind.n_cols - p){
+            Beta_storage_ind.resize(2, EXLASSO_RESIZE_FACTOR * Beta_storage_ind.n_cols);
+            Beta_storage_vec.resize(EXLASSO_RESIZE_FACTOR * Beta_storage_vec.n_elem);
+        }
+
+        // Load sparse matrix storage
+        for(uint j=0; j < p; j++){
+            if(beta_working(j) != 0){
+                // We want to have a coefficient matrix
+                // where rows are features and columns are values of lambda
+                //
+                // Armadillo's batch constructor takes (row, column) pairs
+                // so we build as  (j = feature, i = lambda_index)
+                Beta_storage_ind(0, beta_nnz) = j;
+                Beta_storage_ind(1, beta_nnz) = i;
+                Beta_storage_vec(beta_nnz) = beta_working(j);
+                beta_nnz += 1;
+            }
+        }
     }
+
+    arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
+                      Beta_storage_vec.subvec(0, beta_nnz - 1),
+                      p, n_lambda);
 
     return Beta;
 }

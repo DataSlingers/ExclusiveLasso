@@ -171,13 +171,12 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         coef <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
                                            lambda=lambda, w=weights, o=offset,
                                            thresh=thresh)
+        coef <- Matrix(coef, sparse=TRUE)
     } else {
         coef <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
                                             lambda=lambda, w=weights, o=offset,
                                             thresh_prox=thresh_prox, thresh=thresh)
     }
-
-    coef <- Matrix(coef, sparse=TRUE)
 
     ## Convert coefficients back to original scale
     if(standardize){

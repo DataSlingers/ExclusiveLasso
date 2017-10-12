@@ -1,18 +1,37 @@
 #' CV for the Exclusive Lasso
 #'
 #' @rdname cv.exclusive_lasso
+#' @export
 #' @importFrom foreach foreach %do% %dopar%
 #' @importFrom stats sd
 #' @param X The matrix of predictors (\eqn{X \in \R^{n \times p}}{X})
 #' @param y The response vector (\eqn{y})
 #' @param groups An integer vector of length \eqn{p} indicating group membership.
 #'     (Cf. the \code{index} argument of \code{\link[grplasso]{grplasso}})
-#' @param ... Additional arguments passed to \code{exclusive_lasso}.
+#' @param ... Additional arguments passed to \code{\link{exclusive_lasso}}.
 #' @param type.measure The loss function to be used for cross-validation.
 #' @param nfolds The number of folds (\eqn{K}) to be used for K-fold CV
 #' @param parallel Should CV run in parallel? If a parallel back-end for the
 #'    \code{foreach} package is registered, it will be used. See the
 #'    \code{foreach} documentation for details of different backends.
+#' @examples
+#' n <- 200
+#' p <- 500
+#' groups <- rep(1:10, times=50)
+#' beta <- numeric(p);
+#' beta[1:10] <- 3
+#'
+#' X <- matrix(rnorm(n * p), ncol=p)
+#' y <- X %*% beta + rnorm(n)
+#'
+#' exfit_cv <- cv.exclusive_lasso(X, y, groups, nfolds=5)
+#' print(exfit_cv)
+#' plot(exfit_cv)
+#'
+#' # coef() and predict() work just like
+#' # corresponding methods for exclusive_lasso()
+#' # but can also specify lambda="lambda.min" or "lambda.1se"
+#' coef(exfit_cv, lambda="lambda.1se")
 cv.exclusive_lasso <- function(X, y, groups, ...,
                                type.measure=c("mse", "deviance", "class", "auc", "mae"),
                                nfolds=10, parallel=TRUE){
@@ -75,6 +94,7 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
     r
 }
 
+#' @export
 print.ExclusiveLassoFit_cv <- function(x, ...){
     cat("Exclusive Lasso CV", "\n")
     cat("------------------", "\n")
@@ -91,4 +111,61 @@ print.ExclusiveLassoFit_cv <- function(x, ...){
     print(x$fit, indent=2)
 
     invisible(x)
+}
+
+#' @export
+#' @importFrom stats predict
+predict.ExclusiveLassoFit_cv <- function(object, ...){
+    dots <- list(...)
+    if("s" %in% names(dots)){
+        s <- dots$s
+        if(s == "lambda.min"){
+            s <- object$lambda.min
+        }
+        if(s == "lambda.1se"){
+            s <- object$lambda.1se
+        }
+        dots$s <- s
+    }
+    if("lambda" %in% names(dots)){
+        lambda <- dots$lambda
+        if(lambda == "lambda.min"){
+            lambda <- object$lambda.min
+        }
+        if(lambda == "lambda.1se"){
+            lambda  <- object$lambda.1se
+        }
+        dots$lambda  <- lambda
+    }
+
+    do.call(predict, c(list(object$fit), dots))
+}
+
+
+#' @export
+#' @importFrom stats coef
+coef.ExclusiveLassoFit_cv <- function(object, ...){
+    dots <- list(...)
+    if("s" %in% names(dots)){
+        s <- dots$s
+        if(s == "lambda.min"){
+            s <- object$lambda.min
+        }
+        if(s == "lambda.1se"){
+            s <- object$lambda.1se
+        }
+        dots$s <- s
+    }
+    if("lambda" %in% names(dots)){
+        lambda <- dots$lambda
+        if(lambda == "lambda.min"){
+            lambda <- object$lambda.min
+        }
+        if(lambda == "lambda.1se"){
+            lambda  <- object$lambda.1se
+        }
+        dots$lambda  <- lambda
+    }
+
+    do.call(coef, c(list(object$fit), dots))
 }

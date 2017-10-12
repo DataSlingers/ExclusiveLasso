@@ -34,7 +34,7 @@
 #' @param lambda.min.ratio The smallest value of lambda to be used, as a fraction
 #'      of the largest value of lambda used. Unlike the lasso, there is no
 #'      value of lambda such that the solution is wholly sparse, but we still
-#'      use lambda_max from the lasso. 
+#'      use lambda_max from the lasso.
 #' @param lambda A user-specified sequence of lambdas to use.
 #' @param standardize Should \code{X} be centered and scaled before fitting?
 #' @param intercept Should the fitted model have an (unpenalized) intercept term?
@@ -93,7 +93,9 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         stop(sQuote("exclusive_lasso"), " does not support missing data.")
     }
 
-    groups <- match(groups, unique(groups))
+    ## Index groups from 0 to `num_unique(groups) - 1` to represent
+    ## in a arma::ivec
+    groups <- match(groups, unique(groups)) - 1
 
     family <- match.arg(family)
 

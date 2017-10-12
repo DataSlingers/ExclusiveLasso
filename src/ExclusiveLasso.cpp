@@ -122,6 +122,14 @@ arma:: mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
     arma::vec beta_working(p, arma::fill::zeros);
     arma::vec u = arma::diagvec(X.t() * arma::diagmat(w) * X);
 
+    // Like the working residual, we also store a working copy of
+    // the groupwise norms to speed up calculating the soft-threshold
+    // level
+    //
+    // If called via exclusive_lasso groups will be from 0 to `num_groups - 1`
+    // so this is tight, but should be safe generally.
+    arma::vec g_norms(arma::max(groups) + 1, arma::fill::zeros);
+
     arma::mat Beta(p, n_lambda); Beta.fill(NA_REAL);
 
     // Number of cd iterations -- used to check for interrupts
@@ -143,18 +151,22 @@ arma:: mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
             beta_old = beta_working;
             for(int j=0; j < p; j++){
 
+                double beta = beta_working(j);
+
                 arma::vec xj = X.col(j);
-                r += xj * beta_working(j);
+                r += xj * beta;
+
+                uint g = groups(j);
+                g_norms(g) -= fabs(beta);
 
                 double z = arma::dot(r % w, xj);
-                double lambda_til = n * lambda(i);
+                double lambda_til = n * lambda(i) * g_norms(g);
 
-                // Identify elements in same group and calculate norm
-                arma::uvec g_ix = find(groups(j) == groups);
-                lambda_til *= (arma::norm(beta_working(g_ix), 1) - fabs(beta_working(j)));
+                beta = soft_thresh(z, lambda_til) / (u(j) + n * lambda(i));
+                r -= xj * beta;
+                g_norms(g) += fabs(beta);
 
-                beta_working(j) = soft_thresh(z, lambda_til) / (u(j) + n * lambda(i));
-                r -= xj * beta_working(j);
+                beta_working(j) = beta;
             }
 
             k++;

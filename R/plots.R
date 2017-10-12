@@ -46,7 +46,7 @@ plot.ExclusiveLassoFit <- function(x, xvar=c("norm", "lambda", "l1"),
         xlab <- expression(paste("|", beta, "|")[1])
     }
 
-    COLORS <- brewer.pal(12, "Set3")
+    COLORS <- brewer.pal(9, "Set1")
 
     plot(xvar, x$coef[1, ], type="n", xlab=xlab,
          ylim=range(x$coef),
@@ -54,6 +54,7 @@ plot.ExclusiveLassoFit <- function(x, xvar=c("norm", "lambda", "l1"),
          ylab=expression(hat(beta)))
 
     if(length(colnames(x$X))){
+        labels <- colnames(x$X)
         do_legend <- !is.null(legend)
         if(is.null(label)){
             do_label <- TRUE
@@ -72,7 +73,7 @@ plot.ExclusiveLassoFit <- function(x, xvar=c("norm", "lambda", "l1"),
     legend_colors <- character()
 
     for(i in 1:NCOL(x$X)){
-        y <- x$coef[i, ]; col <- COLORS[(x$groups[i] %% 12) + 1]
+        y <- x$coef[i, ]; col <- COLORS[(x$groups[i] %% 9) + 1]
         lines(xvar, y, col=col, ...)
         if(do_label || do_legend){
             if(do_label_all || (y[length(y)] != 0)){
@@ -82,7 +83,6 @@ plot.ExclusiveLassoFit <- function(x, xvar=c("norm", "lambda", "l1"),
                 }
 
                 if(do_label){
-
                     text_x <- range(xvar) * c(0.95, 1.05)
                     text_x <- if(xvar_rev) min(text_x) else max(text_x)
 
@@ -94,7 +94,7 @@ plot.ExclusiveLassoFit <- function(x, xvar=c("norm", "lambda", "l1"),
     }
 
     if(do_legend){
-        legend(legend, legend=legend_labels, col=legend_colors, bg="white", ...)
+        legend(legend, legend=legend_labels, col=legend_colors, lty=1, lwd=2, bg="white", ...)
     }
 }
 

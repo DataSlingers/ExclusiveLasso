@@ -56,7 +56,7 @@ arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
 }
 
 // [[Rcpp::export]]
-arma:: mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
+arma::mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
                                        const arma::ivec& groups, const arma::vec& lambda,
                                        const arma::vec& w, const arma::vec& o,
                                        double thresh=1e-7, double thresh_prox=1e-7){
@@ -109,10 +109,10 @@ arma:: mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
 }
 
 // [[Rcpp::export]]
-arma:: mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
-                                       const arma::ivec& groups, const arma::vec& lambda,
-                                       const arma::vec& w, const arma::vec& o,
-                                       double thresh=1e-7){
+arma::mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
+                                      const arma::ivec& groups, const arma::vec& lambda,
+                                      const arma::vec& w, const arma::vec& o,
+                                      double thresh=1e-7){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
@@ -120,7 +120,11 @@ arma:: mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
 
     arma::vec r = y - o;
     arma::vec beta_working(p, arma::fill::zeros);
-    arma::vec u = arma::diagvec(X.t() * arma::diagmat(w) * X);
+
+    arma::vec u(p);
+    for(uint i=0; i<p; i++){
+        u(i) = arma::sum(arma::square(X.col(i)) % w);
+    }
 
     // Like the working residual, we also store a working copy of
     // the groupwise norms to speed up calculating the soft-threshold
@@ -150,7 +154,6 @@ arma:: mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
         do {
             beta_old = beta_working;
             for(int j=0; j < p; j++){
-
                 double beta = beta_working(j);
 
                 arma::vec xj = X.col(j);

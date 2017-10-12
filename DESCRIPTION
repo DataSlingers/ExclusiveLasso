@@ -13,7 +13,8 @@ Description: Fit Generalized Linear Models ("GLMs") using the "Exclusive Lasso"
 License: GPL (>= 2)
 Imports: Rcpp (>= 0.12.12), Matrix, RColorBrewer, foreach
 LinkingTo: Rcpp, RcppArmadillo
-Suggests: testthat, knitr, microbenchmark
+Suggests: testthat, knitr, microbenchmark, glmnet, ncvreg, grpreg
 VignetteBuilder: knitr
 RoxygenNote: 6.0.1
 GitHash: $GITHASH$
+BugReports: https://github.com/michaelweylandt/ExclusiveLasso/issues

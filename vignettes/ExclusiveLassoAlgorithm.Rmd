@@ -1,7 +1,7 @@
 ---
 title: "Introduction to the `ExclusiveLasso` Package"
 author: "Michael Weylandt"
-date: "2017-10-06"
+date: "2017-10-12"
 output: html_vignette
 bibliography: vignettes.bibtex
 vignette: >
@@ -44,6 +44,65 @@ used by Campbell and Allen, so we describe the algorithms used in the package
 in detail below.
 
 ## Usage
+
+The `ExclusiveLasso` package implements the exclusive lasso penalty 
+[@Zhou:2010, @Campbell:2017] for structured variable selection. The interface
+and internal design intentionally mimic those of the `glmnet` package [@Friedman:2010] 
+and, by extension, other sparse regression packages which follow `glmnet`, 
+notably `ncvreg` for non-convex regularization and `grpreg` for the group 
+lasso penalty [@Breheny:2011, @Breheny:2015]. 
+
+We demonstrate its use on a small simulated data set: 
+
+```{r}
+set.seed(1234)
+library(ExclusiveLasso)
+
+n <- 100
+p <- 100
+g <- 5
+
+groups <- rep(1:g, length.out=p)
+
+Sig <- toeplitz(0.7^((1:p) - 1))
+Sig_L <- chol(Sig)
+
+beta <- rep(0, p); beta[1:g] <- runif(g, 2, 3)
+X <- matrix(rnorm(n * p), ncol=p) %*% Sig_L
+colnames(X) <- paste0(ifelse(beta != 0, "T", "F"), 1:p)
+y <- X %*% beta + rnorm(n)
+
+exfit <- exclusive_lasso(X, y, groups=groups)
+```
+
+Here we have significant correlation both within and between groups, but the 
+correlation is highest between the 5 true positives. 
+
+When plotting regularization paths, the last variable to leave the active set
+is identified in the legend by default. 
+
+```{r fig.width=7, fig.height=7}
+plot(exfit)
+```
+
+Note that variables from the same group are shown in the same color. 
+
+In many cases where the exclusive lasso is used, we have structural knowledge 
+about the true sparsity pattern and know that we want to select exactly one 
+variable from each group, so tuning $\lambda$ is not essential. If, however, 
+we do wish to tune $\lambda$ in a data-driven manner, the `ExclusiveLasso` package
+provides a $K$-fold cross-validation function: 
+
+```{r fig.width=7, fig.height=7}
+exfit_cv <- cv.exclusive_lasso(X, y, groups=groups)
+plot(exfit_cv)
+```
+
+Running the exclusive lasso is typically quite fast and should not typically 
+be necessary to run cross-validation in parallel. For large problems or problems
+with many groups, it may be necessary to parallize model fits. The `ExclusiveLasso`
+package is integrated with the `foreach` package, which provides interfaces
+to a number of parallelization schemes. 
 
 ## Algorithmic Details
 
@@ -190,8 +249,7 @@ on how the internal minimization is solved, the strategy by which the active
 is chosen, *etc.* Shi *et al.* [-@Shi:2016] review a number of variants. In the
 case of sparse regression, significant speed-ups can also be obtained by use of an
 "active-set" strategy, where non-zero variables are updated more frequently
-than zero variables. For now, we are content with a simple approach where
-all variables are checked sequentially, regardless of whether they are zero or not.
+than zero variables. 
 
 The coordinate updates for the general problem generalize those used
 in the proximal operator. Suppose we wish to update $\beta_i$ where $i \in g$.
@@ -325,6 +383,96 @@ Note that we have an additional factor of $1/n$ due to the extra $n^{-1}$ in
 our problem formulation.
 
 ## Statistical Properties
+
+### Degrees of Freedom
+
+Under our scaling, an unbiased estimate of the degrees of freedom is given by
+\[\hat{\text{df}} = \trace\left[\bX_{\hat{S}}\left(\bX_{\hat{S}}^T\bX_{\hat{S}} + n * \lambda \bM_{\hat{S}}\right)^{\dagger}\bX_{\hat{S}}^T\right]\] where $\bM$ is as above.
+
+This follows by simple substitution of $\lambda \to \lambda * n$ into Theorem 5
+of Campbell and Allen [-@Campbell:2017] to align the two formulations.
+
+## Benchmarks
+
+We implement a few benchmarks to demonstrate the speed of the coordinate-descent
+algorithm used in the `ExclusiveLasso` package. 
+
+
+```{r include=FALSE, echo=FALSE}
+set.seed(1234)
+```
+
+```{r warning=FALSE, error=FALSE, message=FALSE, results="hide"}
+library(microbenchmark)
+
+library(glmnet)
+library(ncvreg)
+library(grpreg)
+library(ExclusiveLasso)
+
+n <- 200
+p <- 1000
+g <- 10
+
+groups <- rep(1:g, length.out=p)
+
+Sig <- toeplitz(1 + 0.95^(1:p))
+Sig_L <- chol(Sig)
+
+X <- matrix(rnorm(n * p), ncol=p) %*% Sig_L
+beta <- rep(0, p); beta[1:g] <- runif(g, 2, 3)
+y <- X %*% beta + rnorm(n)
+
+MB <- microbenchmark(exlasso=exclusive_lasso(X, y, groups=groups),
+                     glmnet=glmnet(X, y),
+                     mcp=ncvreg(X, y, penalty="MCP"),
+                     scad=ncvreg(X, y, penalty="SCAD"),
+                     grplasso=grpreg(X, y, group=groups),
+                     times=20)
+```
+
+This gives the following results on a mid-range Dell XPS 2017 laptop:
+
+```{r echo=FALSE, output='asis', message=FALSE, warning=FALSE, error=FALSE}
+library(knitr)
+
+my_table <- function(object, with_respect_to="glmnet"){
+    sum <- summary(object)
+
+    unit <- attr(sum, "unit")
+
+    sum_abs <- data.frame(round(sum[, "median"], digits=2))
+
+    colnames(sum_abs) <- paste0("Time (", unit, ")")
+
+    for(i in 1:NCOL(sum)){
+        if(is.numeric(sum[1,i])){
+            sum[,i] <- sum[,i] / sum[which(sum[,1] == with_respect_to),i]
+            sum[,i] <- round(sum[,i], digits=2)
+        }
+    }
+
+    sum <- sum[,c("expr", "median", "lq", "mean", "uq")]
+
+    sum[,"expr"] <- paste0("**", sum[,"expr"], "**")
+    sum[,"median"] <- sprintf("**%.2f**", sum[,"median"])
+
+    colnames(sum) <- c("Method", "Median", "Lower Quartile", "Mean", "Upper Quartile")
+
+    sum <- cbind(sum, sum_abs)
+
+    kable(sum, align=c("l", "r", "r", "r", "r", "r"))
+}
+
+my_table(MB)
+```
+
+All results are relative to `glmnet`. While the timings are not directly comparable, 
+since `glmnet`, `ncvreg`, and `exclusive_lasso` all solve different problems, we 
+see that the performance of all three methods is quite good due to the use of efficient
+coordinate descent algorithms. Not surprisingly, the exclusive lasso is slower 
+than the methods with elementwise penalization (`glmnet`, `mcp`, and `scad`), 
+but this is not too surprising given the significantly more complex penalty structure. 
 
 ## References
 

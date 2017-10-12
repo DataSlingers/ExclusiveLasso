@@ -5,6 +5,8 @@
 #define EXLASSO_MAX_ITERATIONS_CD 100000
 #define EXLASSO_PREALLOCATION_FACTOR 10
 #define EXLASSO_RESIZE_FACTOR 2
+#define EXLASSO_FULL_LOOP_FACTOR 10
+#define EXLASSO_FULL_LOOP_MIN 2
 
 // We only include RcppArmadillo.h which pulls Rcpp.h in for us
 #include "RcppArmadillo.h"
@@ -146,6 +148,14 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
     // Number of cd iterations -- used to check for interrupts
     uint k = 0;
 
+    // For first iteration we want to loop over all variables since
+    // we haven't identified the active set yet
+    bool full_loop = true;
+    uint full_loop_count = 0; // Number of full loops completed
+                              // We require at least EXLASSO_FULL_LOOP_MIN
+                              // full loops before moving to the next value
+                              // of lambda to ensure convergence
+
     // Iterate from highest to smallest lambda
     // to take advantage of
     // warm starts for sparsity
@@ -157,7 +167,11 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
             for(int j=0; j < p; j++){
                 double beta = beta_working(j);
 
-                arma::vec xj = X.col(j);
+                if((!full_loop) && (beta == 0)){
+                    continue;
+                }
+
+                const arma::vec xj = X.col(j);
                 r += xj * beta;
 
                 uint g = groups(j);
@@ -173,7 +187,8 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
                 beta_working(j) = beta;
             }
 
-            k++;
+            k++; // Increment loop counter
+
             if((k % EXLASSO_CHECK_USER_INTERRUPT_RATE) == 0){
                 Rcpp::checkUserInterrupt();
             }
@@ -181,7 +196,20 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
                 Rcpp::stop("[ExclusiveLasso::exclusive_lasso_gaussian] Maximum number of coordinate descent iterations reached.");
             }
 
-        } while(arma::norm(beta_working - beta_old) > thresh);
+            if(full_loop){
+                full_loop_count++;
+                // Only check this if not already in full loop mode
+            } else if(arma::norm(beta_working - beta_old) < EXLASSO_FULL_LOOP_FACTOR * thresh){
+                // If it looks like we're closing in on a solution,
+                // switch to looping over all variables
+                full_loop = true;
+            }
+
+        } while((full_loop_count < EXLASSO_FULL_LOOP_MIN) || arma::norm(beta_working - beta_old) > thresh);
+
+        // Switch back to active set loops for next iteration
+        full_loop = false;
+        full_loop_count = 0;
 
         // Extend sparse matrix storage if needed
         if(beta_nnz >= Beta_storage_ind.n_cols - p){

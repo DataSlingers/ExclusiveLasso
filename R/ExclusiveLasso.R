@@ -61,6 +61,7 @@
 #' exfit <- exclusive_lasso(X, y, groups)
 #' @importFrom stats median weighted.mean
 #' @importFrom Matrix Matrix
+#' @importClassesFrom Matrix dgCMatrix
 #' @references
 #' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
 #'     with the Exclusive Lasso". Electronic Journal of Statistics (to appear).

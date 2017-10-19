@@ -18,7 +18,7 @@
 #' @param X The matrix of predictors (\eqn{X \in \R^{n \times p}}{X})
 #' @param y The response vector (\eqn{y})
 #' @param groups An integer vector of length \eqn{p} indicating group membership.
-#'     (Cf. the \code{index} argument of \code{\link[grplasso]{grplasso}})
+#'     (Cf. the \code{group} argument of \code{\link[grpreg]{grpreg}})
 #' @param family The GLM response type. Currently only \code{family="gaussian"}
 #'     is implemented. (Cf. the \code{family} argument of \code{\link[stats]{glm}})
 #' @param weights Weights applied to individual
@@ -60,7 +60,6 @@
 #'
 #' exfit <- exclusive_lasso(X, y, groups)
 #' @importFrom stats median weighted.mean
-#' @importFrom Matrix Matrix
 #' @importClassesFrom Matrix dgCMatrix
 #' @references
 #' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
@@ -172,7 +171,6 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         coef <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
                                            lambda=lambda, w=weights, o=offset,
                                            thresh=thresh)
-        coef <- Matrix(coef, sparse=TRUE)
     } else {
         coef <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
                                             lambda=lambda, w=weights, o=offset,
@@ -275,6 +273,7 @@ coef.ExclusiveLassoFit <- function(object, lambda=s, s=NULL, exact=FALSE, ...){
 #' \code{coef(...)} is a wrapper around \code{predict(..., type="coefficients")}.
 #'
 #' @rdname predict.ExclusiveLassoFit
+#' @importFrom Matrix Matrix
 #' @export
 #' @param object An \code{ExclusiveLassoFit} object produced by \code{\link{exclusive_lasso}}.
 #' @param newx New data \eqn{X \in R^{m \times p}}{X} on which to make predictions. If not

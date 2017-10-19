@@ -60,10 +60,10 @@ arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
 }
 
 // [[Rcpp::export]]
-arma::mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
-                                       const arma::ivec& groups, const arma::vec& lambda,
-                                       const arma::vec& w, const arma::vec& o,
-                                       double thresh=1e-7, double thresh_prox=1e-7){
+arma::sp_mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
+                                         const arma::ivec& groups, const arma::vec& lambda,
+                                         const arma::vec& w, const arma::vec& o,
+                                         double thresh=1e-7, double thresh_prox=1e-7){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
@@ -73,22 +73,21 @@ arma::mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
     arma::vec Xty = X.t() * (w % (y - o)/n);
     double L = arma::max(arma::eig_sym(XtX));
 
-    arma::mat Beta(p, n_lambda); Beta.fill(NA_REAL);
+    uint beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
+    uint beta_nnz = 0;
+    arma::umat Beta_storage_ind(2, beta_nnz_approx);
+    arma::vec  Beta_storage_vec(beta_nnz_approx);
 
     // Number of prox gradient iterations -- used to check for interrupts
     uint k = 0;
 
+    arma::vec beta(p, arma::fill::zeros);
+
     // Iterate from highest to smallest lambda
     // to take advantage of
     // warm starts for sparsity
-    for(int i=n_lambda - 1; i >= 0; i--){
-        arma::vec beta(p);
-        if(i == n_lambda - 1){
-            beta.zeros(p);
-        } else {
-            beta = Beta.col(i + 1);
-        }
 
+    for(int i=n_lambda - 1; i >= 0; i--){
         arma::vec beta_old(p);
 
         do {
@@ -106,8 +105,32 @@ arma::mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
 
         } while(arma::norm(beta - beta_old) > thresh);
 
-        Beta.col(i) = beta;
+        // Extend sparse matrix storage if needed
+        if(beta_nnz >= Beta_storage_ind.n_cols - p){
+            Beta_storage_ind.resize(2, EXLASSO_RESIZE_FACTOR * Beta_storage_ind.n_cols);
+            Beta_storage_vec.resize(EXLASSO_RESIZE_FACTOR * Beta_storage_vec.n_elem);
+        }
+
+        // Load sparse matrix storage
+        for(uint j=0; j < p; j++){
+            if(beta(j) != 0){
+                // We want to have a coefficient matrix
+                // where rows are features and columns are values of lambda
+                //
+                // Armadillo's batch constructor takes (row, column) pairs
+                // so we build as  (j = feature, i = lambda_index)
+                Beta_storage_ind(0, beta_nnz) = j;
+                Beta_storage_ind(1, beta_nnz) = i;
+                Beta_storage_vec(beta_nnz) = beta(j);
+                beta_nnz += 1;
+            }
+        }
+
     }
+
+    arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
+                      Beta_storage_vec.subvec(0, beta_nnz - 1),
+                      p, n_lambda);
 
     return Beta;
 }

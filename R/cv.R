@@ -54,7 +54,7 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
     i <- NULL ## Hack to avoid global variable warning in foreach call below
 
     cv_err <- foreach(i=1:nfolds, .inorder=FALSE,
-                      .packages="ExclusiveLasso") %my.do% {
+                      .packages=c("ExclusiveLasso", "Matrix")) %my.do% {
 
             X_tr <- X[-fold_ids[[i]], ]; X_te <- X[fold_ids[[i]], ]
             y_tr <- y[-fold_ids[[i]]]; y_te <- y[fold_ids[[i]]]

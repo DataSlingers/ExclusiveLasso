@@ -60,6 +60,7 @@
 #'
 #' exfit <- exclusive_lasso(X, y, groups)
 #' @importFrom stats median weighted.mean
+#' @importMethodsFrom Matrix colMeans colSums
 #' @importClassesFrom Matrix dgCMatrix
 #' @references
 #' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
@@ -134,9 +135,11 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         ## FIXME -- This form of standardizing X isn't quite right with observation weights
         Xsc <- scale(X, center=TRUE, scale=TRUE)
         X_scale <- attr(Xsc, "scaled:scale", exact=TRUE)
+        X_center <- attr(Xsc, "scaled:center", exact=TRUE)
     } else {
         Xsc <- X
-        X_scale <- rep(1, nobs)
+        X_scale <- rep(1, nvars)
+        X_center <- rep(0, nvars)
     }
 
     if(missing(lambda)){
@@ -168,33 +171,40 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     algorithm <- match.arg(algorithm)
 
     if(algorithm == "cd"){
-        coef <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
+        res <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
                                            lambda=lambda, w=weights, o=offset,
-                                           thresh=thresh)
+                                           thresh=thresh, intercept=intercept)
     } else {
-        coef <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
-                                            lambda=lambda, w=weights, o=offset,
-                                            thresh_prox=thresh_prox, thresh=thresh)
+        res <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
+                                           lambda=lambda, w=weights, o=offset,
+                                           thresh_prox=thresh_prox, thresh=thresh,
+                                           intercept=intercept)
     }
 
-    ## Convert coefficients back to original scale
+    ## Convert intercept to R vector (arma::vec => R column vector)
+    res$intercept <- as.vector(res$intercept)
+
+    ## Convert coefficients and intercept back to original scale
     if(standardize){
-        coef <- coef * X_scale
+        ## To get back to the original X, we multiply by X_scale,
+        ## so we divide beta to keep things on the same unit
+        res$coef <- res$coef / X_scale
+        if(intercept){
+            ## Map back to original X (undo scale + center)
+            ##
+            ## We handled the scaling above, now we adjust for the
+            ## centering of X: beta(X - colMeans(X)) = beta * X - beta * colMeans(X)
+            ## To uncenter we add back in beta * colMeans(X), summed over all observations
+            res$intercept <- res$intercept - colSums(res$coef * X_center)
+        }
     }
 
     if(!is.null(colnames(X))){
-        rownames(coef) <- colnames(X)
+        rownames(res$coef) <- colnames(X)
     }
 
-    if(intercept){
-        err <- matrix(y - offset, nrow=length(y), ncol=length(lambda)) - X %*% coef
-        intercept <- apply(err, 2, function(x) weighted.mean(x, weights))
-    } else {
-        intercept <- NULL
-    }
-
-    result <- list(coef=coef,
-                   intercept=intercept,
+    result <- list(coef=res$coef,
+                   intercept=res$intercept,
                    y=y,
                    X=X,
                    standardize=standardize,
@@ -320,8 +330,8 @@ predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
             object <- update_fit(object, lambda=lambda, ...)
 
             if(has_intercept(object)){
-               int <- Matrix(object$intercept, nrow=1,
-                             sparse=TRUE, dimnames=list("(Intercept)", NULL))
+                int <- Matrix(object$intercept, nrow=1,
+                              sparse=TRUE, dimnames=list("(Intercept)", NULL))
             } else {
                 int <- Matrix(0, nrow=1, ncol=length(object$lambda),
                               sparse=TRUE, dimnames=list("(Intercept)", NULL))
@@ -330,8 +340,8 @@ predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
             coef <- rbind(int, object$coef)
         } else {
             if(has_intercept(object)){
-               int <- Matrix(object$intercept, nrow=1,
-                             sparse=TRUE, dimnames=list("(Intercept)", NULL))
+                int <- Matrix(object$intercept, nrow=1,
+                              sparse=TRUE, dimnames=list("(Intercept)", NULL))
             } else {
                 int <- Matrix(0, nrow=1, ncol=length(object$lambda),
                               sparse=TRUE, dimnames=list("(Intercept)", NULL))
@@ -346,12 +356,12 @@ predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
         }
     } else {
         if(has_intercept(object)){
-               int <- Matrix(object$intercept, nrow=1,
-                             sparse=TRUE, dimnames=list("(Intercept)", NULL))
-            } else {
-                int <- Matrix(0, nrow=1, ncol=length(object$lambda),
-                              sparse=TRUE, dimnames=list("(Intercept)", NULL))
-            }
+             int <- Matrix(object$intercept, nrow=1,
+                           sparse=TRUE, dimnames=list("(Intercept)", NULL))
+        } else {
+             int <- Matrix(0, nrow=1, ncol=length(object$lambda),
+                           sparse=TRUE, dimnames=list("(Intercept)", NULL))
+        }
 
         coef <- rbind(int, object$coef)
     }

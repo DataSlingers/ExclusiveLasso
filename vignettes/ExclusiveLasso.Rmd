@@ -94,7 +94,7 @@ we do wish to tune $\lambda$ in a data-driven manner, the `ExclusiveLasso` packa
 provides a $K$-fold cross-validation function: 
 
 ```{r fig.width=7, fig.height=7}
-exfit_cv <- cv.exclusive_lasso(X, y, groups=groups)
+exfit_cv <- cv.exclusive_lasso(X, y, groups=groups, parallel=FALSE)
 plot(exfit_cv)
 ```
 
@@ -161,7 +161,7 @@ convergence conditions of which were analyzed by Schmidt *et al.* [-@Schmidt:201
 Campbell and Allen [-@Campbell:2017] propose the use of a coordinate-descent
 scheme to evaluate the proximal operator, described in more detail below.
 
-### Evaluation of the Proximal Operator
+#### Evaluation of the Proximal Operator
 
 We wish to evaluate the proximal operator:
 \[\argmin_{x} \frac{1}{2}\|x - z\|_2^2 + \frac{c}{2}\sum_{g \in \mathcal{G}} \|x_g\|_1^2\]
@@ -196,7 +196,7 @@ giving the coordinate update:
 Pulling the common $(1+c)^{-1}$ term out we get:
 \[x_i \leftarrow \frac{1}{1+c} \mathcal{S}_{c\|x^{-i}\|}\left(z_i\right)\]
 
-### Combined Algorithm
+#### Combined Algorithm
 
 Putting these pieces together, we get the following Exclusive Lasso algorithm
 for $\eqref{eq:el-gaussian}$.
@@ -214,8 +214,8 @@ for $\eqref{eq:el-gaussian}$.
     - $\beta^{(k)} = x$
     - $k := k + 1$.
 
-Generalizing slightly, if we have a vector of offsets $\bo$ and a (diagonal) weight
-matrix $\bW$, the combined algorithm becomes:
+Generalizing slightly, if we have a vector of offsets $\bo$ and a (diagonal) 
+weight matrix $\bW$ and an intercept term $\alpha$, the combined algorithm becomes:
 
 1. Initialize
     - $\beta^{(0)} = 0$
@@ -228,6 +228,7 @@ matrix $\bW$, the combined algorithm becomes:
         - Repeat until convergence, looping over each $i \in g$:
           \[x_{g, i} = \mathcal{S}_{\frac{2t\lambda}{1 + t\lambda}\|x_{g, -i}\|_1}\left(\frac{t\lambda}{1+t\lambda} z_{g, i}\right)\]
     - $\beta^{(k)} = x$
+    - $\alpha^{(k)} = \left\langle \text{diag}(\bW)/n, \by - \bo - \bX\beta\right\rangle$
     - $k := k + 1$.
 
 ### Coordinate Descent
@@ -298,7 +299,8 @@ be much improved by "warm-starting" $\beta^{(0)}$ at the solution for
 a nearby value of $\lambda$.
 
 For the general case with offsets $\bo$ and a (diagonal) weight
-matrix $\bW$, the combined algorithm becomes:
+matrix $\bW$, as well as an unpenalized intercept $\alpha$, the combined 
+algorithm becomes:
 
 1. Initialize
     - $\beta = 0$
@@ -312,7 +314,9 @@ matrix $\bW$, the combined algorithm becomes:
         - Set $z = \br^T\bW\bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g,-i}\|_1$
         - Update:
             \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(z)\]
-        - Update working residual: $\br := \br - \bX_i\beta_i$
+        - Update working residual: $\br := \br - \bX_i\beta_i + \alpha 1_{n}$
+        - Update intercept: $\alpha := \langle \br, \text{diag}(\bW)/n \rangle$
+        - Update working residual: $\br := \br - \alpha 1_{n}$
 
 ## Stationary Conditions
 

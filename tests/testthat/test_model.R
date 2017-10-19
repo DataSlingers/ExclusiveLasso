@@ -1,6 +1,5 @@
 context("Helper functions work")
 
-
 test_that("coef() works with original lambda", {
     set.seed(5454)
 

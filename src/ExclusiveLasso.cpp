@@ -1,5 +1,5 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
-#define EXLASSO_CHECK_USER_INTERRUPT_RATE 20
+#define EXLASSO_CHECK_USER_INTERRUPT_RATE 50
 #define EXLASSO_MAX_ITERATIONS_PROX 100
 #define EXLASSO_MAX_ITERATIONS_PG 100000
 #define EXLASSO_MAX_ITERATIONS_CD 100000
@@ -60,10 +60,11 @@ arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
 }
 
 // [[Rcpp::export]]
-arma::sp_mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
-                                         const arma::ivec& groups, const arma::vec& lambda,
-                                         const arma::vec& w, const arma::vec& o,
-                                         double thresh=1e-7, double thresh_prox=1e-7){
+Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
+                                       const arma::ivec& groups, const arma::vec& lambda,
+                                       const arma::vec& w, const arma::vec& o,
+                                       double thresh=1e-7, double thresh_prox=1e-7,
+                                       bool intercept=true){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
@@ -78,10 +79,16 @@ arma::sp_mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
     arma::umat Beta_storage_ind(2, beta_nnz_approx);
     arma::vec  Beta_storage_vec(beta_nnz_approx);
 
+    // Storage for intercepts
+    arma::vec Alpha(n_lambda, arma::fill::zeros);
+
     // Number of prox gradient iterations -- used to check for interrupts
     uint k = 0;
 
     arma::vec beta(p, arma::fill::zeros);
+    double alpha = 0;
+
+    arma::vec N = X.t() * arma::diagmat(w/n) * arma::colvec(n, arma::fill::ones);
 
     // Iterate from highest to smallest lambda
     // to take advantage of
@@ -92,8 +99,12 @@ arma::sp_mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
 
         do {
             beta_old = beta;
-            arma::vec z = beta + 1/L * (Xty - XtX * beta);
+            arma::vec z = beta + 1/L * (Xty - N * alpha - XtX * beta);
             beta = exclusive_lasso_prox(z, groups, lambda(i)/L, thresh_prox);
+
+            if(intercept){
+                alpha = arma::dot(w/n, y - o - X * beta);
+            }
 
             k++;
             if((k % EXLASSO_CHECK_USER_INTERRUPT_RATE) == 0){
@@ -126,20 +137,29 @@ arma::sp_mat exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
             }
         }
 
+        if(intercept){
+            Alpha(i) = alpha;
+        }
     }
 
     arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
                       Beta_storage_vec.subvec(0, beta_nnz - 1),
                       p, n_lambda);
 
-    return Beta;
+    if(intercept){
+        return Rcpp::List::create(Rcpp::Named("intercept")=Alpha,
+                                  Rcpp::Named("coef")=Beta);
+    } else {
+        return Rcpp::List::create(Rcpp::Named("intercept")=R_NilValue,
+                                  Rcpp::Named("coef")=Beta);
+    }
 }
 
 // [[Rcpp::export]]
-arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
-                                         const arma::ivec& groups, const arma::vec& lambda,
-                                         const arma::vec& w, const arma::vec& o,
-                                         double thresh=1e-7){
+Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
+                                       const arma::ivec& groups, const arma::vec& lambda,
+                                       const arma::vec& w, const arma::vec& o,
+                                       double thresh=1e-7, bool intercept=true){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
@@ -147,6 +167,7 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
 
     arma::vec r = y - o;
     arma::vec beta_working(p, arma::fill::zeros);
+    double alpha = 0;
 
     arma::vec u(p);
     for(uint i=0; i<p; i++){
@@ -167,6 +188,8 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
     arma::vec  Beta_storage_vec(beta_nnz_approx);
 
     arma::vec beta_old(p, arma::fill::zeros);
+
+    arma::vec Alpha(n_lambda, arma::fill::zeros); // Storage for intercepts
 
     // Number of cd iterations -- used to check for interrupts
     uint k = 0;
@@ -208,6 +231,12 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
                 g_norms(g) += fabs(beta);
 
                 beta_working(j) = beta;
+            }
+
+            if(intercept){
+                r += alpha;
+                alpha = arma::dot(r, w/n);
+                r -= alpha;
             }
 
             k++; // Increment loop counter
@@ -254,11 +283,19 @@ arma::sp_mat exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
                 beta_nnz += 1;
             }
         }
+
+        Alpha(i) = alpha;
     }
 
     arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
                       Beta_storage_vec.subvec(0, beta_nnz - 1),
                       p, n_lambda);
 
-    return Beta;
+    if(intercept){
+        return Rcpp::List::create(Rcpp::Named("intercept")=Alpha,
+                                  Rcpp::Named("coef")=Beta);
+    } else {
+        return Rcpp::List::create(Rcpp::Named("intercept")=R_NilValue,
+                                  Rcpp::Named("coef")=Beta);
+    }
 }

@@ -140,7 +140,7 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     }
 
     if(missing(lambda)){
-        lambda_max <- max(abs(crossprod(X, y - offset - weighted.mean(y, weights) * intercept)/nobs))
+        lambda_max <- max(abs(crossprod(Xsc, y - offset - weighted.mean(y, weights) * intercept)/nobs))
         lambda <- logspace(lambda.min.ratio * lambda_max, lambda_max, length.out=nlambda)
     }
 

@@ -220,3 +220,38 @@ test_that("predict() works -- test data", {
 
     expect_error(predict(elfit, newx=X2)) ## Offset required
 })
+
+test_that("predict(group_threshold=TRUE) works", {
+    set.seed(1728)
+
+    n <- 200
+    p <- 500
+    groups <- rep(1:50, length.out=p)
+
+    beta <- numeric(p); beta[1:max(groups)] <- 2
+    X <- matrix(rnorm(n * p), ncol=p); X2 <- matrix(rnorm(n * p), ncol=p)
+    colnames(X) <- paste0("A", 1:p)
+
+    y <- X %*% beta + rnorm(n)
+
+    nlambda <- 30
+
+    ## With intercept
+    elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda)
+
+    ## Basic check
+    expect_true(all(colSums(coef(elfit, group_threshold=TRUE) != 0) == 51))
+    expect_true(all(colSums(coef(elfit, group_threshold=FALSE) != 0) >= 51))
+
+    ## Keep rownames
+    expect_equal(rownames(coef(elfit, group_threshold=TRUE)),
+                 rownames(coef(elfit, group_threshold=FALSE)))
+    expect_equal(rownames(coef(elfit, group_threshold=TRUE)),
+                 c("(Intercept)", paste0("A", 1:p)))
+
+    ## Doesn't threshold intercept
+    expect_true(all(coef(elfit, group_threshold=TRUE)[1,] != 0))
+
+    ## One per group
+    expect_equal(anyDuplicated(groups[coef(elfit, group_threshold=TRUE)[-1, 25] != 0]), 0)
+})

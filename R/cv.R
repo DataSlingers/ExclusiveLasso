@@ -7,7 +7,7 @@
 #' @param X The matrix of predictors (\eqn{X \in \R^{n \times p}}{X})
 #' @param y The response vector (\eqn{y})
 #' @param groups An integer vector of length \eqn{p} indicating group membership.
-#'     (Cf. the \code{index} argument of \code{\link[grplasso]{grplasso}})
+#'     (Cf. the \code{index} argument of \code{\link[grplasso]{grpreg}})
 #' @param ... Additional arguments passed to \code{\link{exclusive_lasso}}.
 #' @param type.measure The loss function to be used for cross-validation.
 #' @param nfolds The number of folds (\eqn{K}) to be used for K-fold CV

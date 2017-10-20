@@ -273,8 +273,11 @@ update_fit <- function(object, lambda, ...){
 #' @rdname predict.ExclusiveLassoFit
 #' @export
 #' @importFrom stats predict
-coef.ExclusiveLassoFit <- function(object, lambda=s, s=NULL, exact=FALSE, ...){
-    predict(object, lambda=lambda, type="coefficients", exact=exact, ...)
+coef.ExclusiveLassoFit <- function(object, lambda=s, s=NULL,
+                                   exact=FALSE, group_threshold=FALSE, ...){
+
+    predict(object, lambda=lambda, type="coefficients",
+            exact=exact, group_threshold=group_threshold, ...)
 }
 
 #' Make predictions using the exclusive lasso.
@@ -304,6 +307,8 @@ coef.ExclusiveLassoFit <- function(object, lambda=s, s=NULL, exact=FALSE, ...){
 #' @param offset An offset term used in predictions. If not supplied, all offets are
 #'    taken to be zero. If the original fit was made with an offset, \code{offset} will
 #'    be required.
+#' @param group_threshold If \code{TRUE}, (hard-)threshold coefficients so that
+#'    there is exactly one non-zero coefficient in each group.
 #' @param ... Additional arguments passed to \code{\link{exclusive_lasso}} if
 #'    \code{exact=TRUE} and ignored otherwise.
 #' @examples
@@ -321,6 +326,7 @@ coef.ExclusiveLassoFit <- function(object, lambda=s, s=NULL, exact=FALSE, ...){
 #' predict(exfit, lambda=1, newx = -X)
 predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
                                       type=c("link", "response", "coefficients"),
+                                      group_threshold=FALSE,
                                       exact=FALSE, offset, ...){
     type <- match.arg(type)
 
@@ -366,6 +372,10 @@ predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
         coef <- rbind(int, object$coef)
     }
 
+    if(group_threshold){
+            coef[-1,,drop=FALSE] <- Matrix(apply(coef[-1,,drop=FALSE], 2, do_group_threshold, object$groups), sparse=TRUE)
+    }
+
     if(type == "coefficients"){
         return(coef) ## Done
     }
@@ -394,4 +404,12 @@ predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
            binomial=inv_logit(link),
            poisson=exp(link))
     }
+}
+
+do_group_threshold <- function(x, groups){
+    for(g in unique(groups)){
+        g_ix <- (g == groups)
+        x[g_ix] <- x[g_ix] * (abs(x[g_ix]) == max(abs(x[g_ix])))
+    }
+    x
 }

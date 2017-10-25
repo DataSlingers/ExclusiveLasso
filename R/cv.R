@@ -44,6 +44,15 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
         stop("Only", sQuote("mse"), "loss currently supported.")
     }
 
+    dots <- list(...)
+    if("offset" %in% names(dots)){
+        warning("Offsets not propogated during CV. Results may be unreliable.")
+    }
+
+    if("weights" %in% names(dots)){
+        warning("Observation weights not propogated during CV. Results may be unreliable.")
+    }
+
     fit <- exclusive_lasso(X=X, y=y, groups=groups, ...)
     lambdas <- fit$lambda
 

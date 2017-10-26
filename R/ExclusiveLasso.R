@@ -64,7 +64,8 @@
 #' @importClassesFrom Matrix dgCMatrix
 #' @references
 #' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
-#'     with the Exclusive Lasso". Electronic Journal of Statistics (to appear).
+#'     with the Exclusive Lasso". Electronic Journal of Statistics 11(2),
+#'     pp.4220-4257. 2017. \url{https://doi.org/10.1214/17-EJS1317}
 #' @export
 exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "poisson"),
                             weights, offset, nlambda=100,

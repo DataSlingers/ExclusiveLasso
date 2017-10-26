@@ -2,6 +2,12 @@ language: R
 sudo: false
 cache: packages
 
+os: 
+  - linux
+  - osx
+
+osx_image: xcode9
+
 r_packages:
   - Rcpp
   - RcppArmadillo
@@ -34,3 +40,4 @@ deploy:
     branch: master
   local_dir: .
   target_branch: build
+  condition: $TRAVIS_OS_NAME = "linux"

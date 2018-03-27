@@ -8,8 +8,9 @@ Authors@R: c(
     person("Frederick", "Campbell", role="aut", email="fc10@rice.edu"),
     person("Genevera", "Allen", role="aut", email = "gallen@rice.edu"))
 Description: Fit Generalized Linear Models ("GLMs") using the "Exclusive Lasso"
-    penalty of Zhou et al (2010) using the Inexact Proximal Gradient algorithm
-    of Campbell and Allen (2017).
+    penalty of Zhou et al (2010) using the Coordinate Descent and
+    Inexact Proximal Gradient algorithms of Campbell and Allen (2017)
+    <https://projecteuclid.org/euclid.ejs/1509004863>.
 License: GPL (>= 2)
 Imports: Rcpp (>= 0.12.12), Matrix, RColorBrewer, foreach
 LinkingTo: Rcpp, RcppArmadillo (>= 0.8.300.1.0)
@@ -18,3 +19,4 @@ VignetteBuilder: knitr
 RoxygenNote: 6.0.1
 GitHash: $GITHASH$
 BugReports: https://github.com/michaelweylandt/ExclusiveLasso/issues
+URL: https://github.com/michaelweylandt/ExclusiveLasso

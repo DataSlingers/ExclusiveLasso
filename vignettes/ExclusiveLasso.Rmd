@@ -432,13 +432,18 @@ X <- matrix(rnorm(n * p), ncol=p) %*% Sig_L
 beta <- rep(0, p); beta[1:g] <- runif(g, 2, 3)
 y <- X %*% beta + rnorm(n)
 
-MB <- microbenchmark(exlasso=exclusive_lasso(X, y, groups=groups),
+MB <- microbenchmark(exlasso=exclusive_lasso(X, y, groups=groups, skip_df=TRUE),
                      glmnet=glmnet(X, y),
                      mcp=ncvreg(X, y, penalty="MCP"),
                      scad=ncvreg(X, y, penalty="SCAD"),
                      grplasso=grpreg(X, y, group=groups),
                      times=20)
 ```
+
+We skip the degrees of freedom calculation for the exclusive lasso for consistency
+with `ncvreg` and `grpreg`. (`glmnet` does return degrees of freedom, but it is
+essentially free for `l1` penalized models and incorrect for models with $\ell_2$
+penalization.)
 
 This gives the following results on a mid-range Dell XPS 2017 laptop:
 

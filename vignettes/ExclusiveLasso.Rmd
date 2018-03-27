@@ -396,6 +396,11 @@ Under our scaling, an unbiased estimate of the degrees of freedom is given by
 This follows by simple substitution of $\lambda \to \lambda * n$ into Theorem 5
 of Campbell and Allen [-@Campbell:2017] to align the two formulations.
 
+To improve numerical stability, we add a small multiple of the identity matrix
+to the $\bX_{\hat{X}}^T\bX_{\hat{S}} + n * \lambda \bM_{\hat{S}}$ term before
+taking the (pseudo)-inverse.^[ After adding this term, this matrix is always
+strictly positive definite so the pseudo-inverse becomes the standard inverse.]
+
 ## Benchmarks
 
 We implement a few benchmarks to demonstrate the speed of the coordinate-descent
@@ -471,12 +476,14 @@ my_table <- function(object, with_respect_to="glmnet"){
 my_table(MB)
 ```
 
-All results are relative to `glmnet`. While the timings are not directly comparable, 
-since `glmnet`, `ncvreg`, and `exclusive_lasso` all solve different problems, we 
+All results are relative to `glmnet`. While the timings are not directly comparable,
+since `glmnet`, `ncvreg`, and `exclusive_lasso` all solve different problems, we
 see that the performance of all three methods is quite good due to the use of efficient
-coordinate descent algorithms. Not surprisingly, the exclusive lasso is slower 
-than the methods with elementwise penalization (`glmnet`, `mcp`, and `scad`), 
-but this is not too surprising given the significantly more complex penalty structure. 
+coordinate descent algorithms. Not surprisingly, the exclusive lasso is slower
+than the methods with elementwise penalization (`glmnet`, `mcp`, and `scad`),
+but this is not too surprising given the significantly more complex penalty structure.
+In practice, the current implementation of the degrees of freedom calculation takes
+considerably more time than actual computation of the regularization path.
 
 ## References
 

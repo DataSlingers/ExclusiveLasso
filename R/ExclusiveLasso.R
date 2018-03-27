@@ -43,6 +43,9 @@
 #'    penalized regression problem.
 #' @param thresh_prox The convergence threshold used for the
 #'    coordinate-descent algorithm used to evaluate the proximal operator.
+#' @param skip_df Should the DF calculations be skipped? They are often slower
+#'    than the actual model fitting; if calling \code{exclusive_lasso} repeatedly
+#'    it may be useful to skip these calculations.
 #' @param algorithm Which algorithm to use, proximal gradient (\code{"pg"}) or
 #'    coordinate descent (\code{"cd"})? Empirically, coordinate descent appears
 #'    to be faster for most problems (consistent with Campbell and Allen), but
@@ -62,16 +65,27 @@
 #' @importFrom stats median weighted.mean
 #' @importMethodsFrom Matrix colMeans colSums
 #' @importClassesFrom Matrix dgCMatrix
+#' @return An object of class \code{ExclusiveLassoFit} containing \itemize{
+#' \item \code{coef} - A matrix of estimated coefficients
+#' \item \code{intercept} - A vector of estimated intercepts if \code{intercept=TRUE}
+#' \item \code{X, y, groups, weights, offset} - The data used to fit the model
+#' \item \code{lambda} - The vector of \eqn{\lambda}{lambda} used
+#' \item \code{df} - An unbiased estimate of the degrees of freedom (see Theorem
+#'       5 in [1])
+#' \item \code{nnz} - The number of non-zero coefficients at each value of
+#'       \eqn{\lambda}{lambda}
+#' }
 #' @references
 #' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
 #'     with the Exclusive Lasso". Electronic Journal of Statistics 11(2),
-#'     pp.4220-4257. 2017. \url{https://doi.org/10.1214/17-EJS1317}
+#'     pp.4220-4257. 2017. \doi{10.1214/17-EJS1317}
 #' @export
 exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "poisson"),
                             weights, offset, nlambda=100,
                             lambda.min.ratio=ifelse(nobs < nvars, 0.01, 1e-04),
                             lambda, standardize=TRUE, intercept=TRUE,
                             thresh=1e-07, thresh_prox=thresh,
+                            skip_df=FALSE,
                             algorithm=c("cd", "pg")){
 
     tic <- Sys.time()
@@ -200,6 +214,33 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         }
     }
 
+    ## Degrees of freedom -- calculated using original scale matrix
+    ## (though it shouldn't really matter)
+    ##
+    ## Loop over each solution and calculate M matrix
+    ## and from there DF
+    if(!skip_df){
+        df <- rep(NA, length(lambda))
+        for(ix in seq(length(lambda), 1, by=-1)){
+            l <- lambda[ix]
+            S <- which(res$coef[,ix] != 0)
+            M <- matrix(0, nrow=nvars, ncol=nvars)
+
+            for(g in unique(groups)){
+                g_ix <- which(groups == g)
+                s_g <- sign(res$coef[g_ix, ix])
+                M[g_ix, g_ix] <- outer(s_g, s_g)
+            }
+
+            diag(M) <- diag(M) + 1e-4 ## For numerical stability in inverse step
+            X_S <- X[,S]
+            projection_mat <- X_S %*% solve(crossprod(X_S) + nobs * l * M[S, S], t(X_S))
+            df[ix] <- sum(diag(projection_mat))
+        }
+    } else {
+      df <- NULL
+    }
+
     if(!is.null(colnames(X))){
         rownames(res$coef) <- colnames(X)
     }
@@ -214,6 +255,8 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
                    weights=weights,
                    offset=offset,
                    family=family,
+                   df=df,
+                   nnz=apply(res$coef, 2, function(x) sum(x != 0)),
                    time=Sys.time() - tic)
 
     class(result) <- c("ExclusiveLassoFit", class(result))
@@ -240,6 +283,10 @@ print.ExclusiveLassoFit <- function(x, ..., indent=0){
     icat("Grid:", length(x$lambda), "values of lambda. \n", indent=indent)
     icat("  Miniumum:", min(x$lambda), "\n", indent=indent)
     icat("  Maximum: ", max(x$lambda), "\n", indent=indent)
+    if(!is.null(x$df)){
+      icat("  Degrees of freedom: ", min(x$df), " --> ", max(x$df), "\n", indent=indent)
+    }
+    icat("  Number of selected variables:", min(x$nnz), " --> ", max(x$nnz), "\n", indent=indent)
     icat("\n", indent=indent)
     icat("Fit Options:\n", indent=indent)
     icat("  - Family:        ", capitalize_string(x$family), "\n", indent=indent)

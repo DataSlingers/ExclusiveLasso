@@ -255,3 +255,42 @@ test_that("predict(group_threshold=TRUE) works", {
     ## One per group
     expect_equal(anyDuplicated(groups[coef(elfit, group_threshold=TRUE)[-1, 25] != 0]), 0)
 })
+
+test_that("df calculations are correct", {
+    ## In the case of single element groups,
+    ## we have the degrees of freedom from ridge regression
+    set.seed(150)
+    n <- 200
+    p <- 30
+    X <- matrix(rnorm(n * p), ncol=p)
+    groups <- seq(1, p)
+    beta <- runif(p, 2, 3); beta[10:p] <- 0
+
+    y <- X %*% beta + rnorm(n)
+
+    exfit <- exclusive_lasso(X, y, groups)
+
+    d <- svd(X, nu=0, nv=0)$d
+
+    for(ix in seq_along(exfit$lambda)){
+        lambda <- exfit$lambda[ix]
+        df <- exfit$df[ix]
+
+        df_rr <- sum(d^2 / (d^2 + n * lambda))
+
+        # Loose check since we regularize the "denominator" in DF calcs
+        expect_equal(df, df_rr, tolerance=1e-4)
+    }
+
+    ## DF should always be less than number of variables
+    p <- 300
+    X <- matrix(rnorm(n * p), ncol=p)
+    groups <- rep(1:10, length.out=p)
+    beta <- rep(0, p); beta[1:10] <- runif(10, 3, 5)
+
+    y <- X %*% beta + rnorm(n)
+
+    exfit <- exclusive_lasso(X, y, groups)
+
+    expect_true(all(exfit$df <= exfit$nnz))
+})

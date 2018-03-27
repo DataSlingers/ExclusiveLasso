@@ -14,6 +14,13 @@
 #' @param parallel Should CV run in parallel? If a parallel back-end for the
 #'    \code{foreach} package is registered, it will be used. See the
 #'    \code{foreach} documentation for details of different backends.
+#' @details As discussed in Appendix F of Campbell and Allen [1], cross-validation
+#'    can be quite unstable for exclusive lasso problems. Model selection by BIC
+#'    or EBIC tends to perform better in practice.
+#' @references
+#' Campbell, Frederick and Genevera I. Allen. "Within Group Variable Selection
+#'     with the Exclusive Lasso." Electronic Journal of Statistics 11(2),
+#'     pp.4220-4257. 2017. \doi{10.1214/EJS-1317}
 #' @examples
 #' n <- 200
 #' p <- 500

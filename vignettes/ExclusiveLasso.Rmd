@@ -10,7 +10,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r echo=FALSE,cache=FALSE}
+```{r echo=FALSE, cache=FALSE}
 set.seed(1234)
 knitr::opts_chunk$set(cache=TRUE)
 ```
@@ -29,15 +29,21 @@ knitr::opts_chunk$set(cache=TRUE)
 \newcommand{\by}{\mathbf{y}}
 \newcommand{\bz}{\mathbf{z}}
 \newcommand{\bW}{\mathbf{W}}
+\newcommand{\bg}{\mathbf{g}}
+\newcommand{\bV}{\mathbf{V}}
+\newcommand{\bmu}{\mathbf{\mu}}
 \DeclareMathOperator{\prox}{\textsf{prox}}
 \]
 
 The `ExclusiveLasso` package implements the exclusive lasso penalty of Zhou *et
 al.* [-@Zhou:2010], which Obozinski and Bach showed is the tightest convex
-relaxation of the combinatorial "exactly one non-zero element in each group"
-[-@Obozinski:2012, Section 4.2]. We use a proximal gradient algorithm, with
-coordinate descent used to evaluate the proximal operator, as proposed by
-Campbell and Allen [-@Campbell:2017].
+relaxation of the combinatorial constraint "exactly one non-zero element in each
+group" [-@Obozinski:2012, Section 4.2]. For the Gaussian case, we implement
+the two algorithms discussed in Campbell and Allen [@Campbell:2017]:
+
+  - proximal gradient descent, with coordinate descent used to evaluate the
+    proximal operator;
+  - full coordinate descent algorithm.
 
 The scalings used in the `ExclusiveLasso` package are not exactly those
 used by Campbell and Allen, so we describe the algorithms used in the package
@@ -45,14 +51,14 @@ in detail below.
 
 ## Usage
 
-The `ExclusiveLasso` package implements the exclusive lasso penalty 
+The `ExclusiveLasso` package implements the exclusive lasso penalty
 [@Zhou:2010, @Campbell:2017] for structured variable selection. The interface
-and internal design intentionally mimic those of the `glmnet` package [@Friedman:2010] 
-and, by extension, other sparse regression packages which follow `glmnet`, 
-notably `ncvreg` for non-convex regularization and `grpreg` for the group 
-lasso penalty [@Breheny:2011, @Breheny:2015]. 
+and internal design intentionally mimic those of the `glmnet` package [@Friedman:2010]
+and, by extension, other sparse regression packages which follow `glmnet`,
+notably `ncvreg` for non-convex regularization and `grpreg` for the group
+lasso penalty [@Breheny:2011, @Breheny:2015].
 
-We demonstrate its use on a small simulated data set: 
+We demonstrate its use on a small simulated data set:
 
 ```{r}
 set.seed(1234)
@@ -75,41 +81,41 @@ y <- X %*% beta + rnorm(n)
 exfit <- exclusive_lasso(X, y, groups=groups)
 ```
 
-Here we have significant correlation both within and between groups, but the 
-correlation is highest between the 5 true positives. 
+Here we have significant correlation both within and between groups, but the
+correlation is highest between the 5 true positives.
 
 When plotting regularization paths, the last variable to leave the active set
-is identified in the legend by default. 
+is identified in the legend by default.
 
 ```{r fig.width=7, fig.height=7}
 plot(exfit)
 ```
 
-Note that variables from the same group are shown in the same color. 
+Note that variables from the same group are shown in the same color.
 
-In many cases where the exclusive lasso is used, we have structural knowledge 
-about the true sparsity pattern and know that we want to select exactly one 
-variable from each group, so tuning $\lambda$ is not essential. If, however, 
+In many cases where the exclusive lasso is used, we have structural knowledge
+about the true sparsity pattern and know that we want to select exactly one
+variable from each group, so tuning $\lambda$ is not essential. If, however,
 we do wish to tune $\lambda$ in a data-driven manner, the `ExclusiveLasso` package
-provides a $K$-fold cross-validation function: 
+provides a $K$-fold cross-validation function:
 
 ```{r fig.width=7, fig.height=7}
 exfit_cv <- cv.exclusive_lasso(X, y, groups=groups, parallel=FALSE)
 plot(exfit_cv)
 ```
 
-Running the exclusive lasso is typically quite fast and should not typically 
+Running the exclusive lasso is typically quite fast and should not typically
 be necessary to run cross-validation in parallel. For large problems or problems
 with many groups, it may be necessary to parallize model fits. The `ExclusiveLasso`
 package is integrated with the `foreach` package, which provides interfaces
-to a number of parallelization schemes. 
+to a number of parallelization schemes.
 
 ## Algorithmic Details
 
 We use the "$1/n$"-scaling for penalized regression, as well as including a
 factor of $1/2$ in the penalty term:
 
-\[\hat{\beta}_{\text{EL}} = \argmin -\frac{1}{n}\sum_{i=1}^n \ell(y_i; \bx_i^T\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2} \tag{EL-GLM}\]
+\[\hat{\beta}_{\text{EL}} = \argmin -\frac{1}{n}\sum_{i=1}^n \ell(y_i; \bx_i^T\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2} \tag{EL-GLM} \label{eq:el-glm}\]
 
 where $\ell(y_i; \bx_i^T\beta)$ is the log-likelihood of the observation $(\bx_i, y_i)$.
 
@@ -214,7 +220,7 @@ for $\eqref{eq:el-gaussian}$.
     - $\beta^{(k)} = x$
     - $k := k + 1$.
 
-Generalizing slightly, if we have a vector of offsets $\bo$ and a (diagonal) 
+Generalizing slightly, if we have a vector of offsets $\bo$ and a (diagonal)
 weight matrix $\bW$ and an intercept term $\alpha$, the combined algorithm becomes:
 
 1. Initialize
@@ -250,7 +256,7 @@ on how the internal minimization is solved, the strategy by which the active
 is chosen, *etc.* Shi *et al.* [-@Shi:2016] review a number of variants. In the
 case of sparse regression, significant speed-ups can also be obtained by use of an
 "active-set" strategy, where non-zero variables are updated more frequently
-than zero variables. 
+than zero variables.
 
 The coordinate updates for the general problem generalize those used
 in the proximal operator. Suppose we wish to update $\beta_i$ where $i \in g$.
@@ -299,7 +305,7 @@ be much improved by "warm-starting" $\beta^{(0)}$ at the solution for
 a nearby value of $\lambda$.
 
 For the general case with offsets $\bo$ and a (diagonal) weight
-matrix $\bW$, as well as an unpenalized intercept $\alpha$, the combined 
+matrix $\bW$, as well as an unpenalized intercept $\alpha$, the combined
 algorithm becomes:
 
 1. Initialize
@@ -317,6 +323,84 @@ algorithm becomes:
         - Update working residual: $\br := \br - \bX_i\beta_i + \alpha 1_{n}$
         - Update intercept: $\alpha := \langle \br, \text{diag}(\bW)/n \rangle$
         - Update working residual: $\br := \br - \alpha 1_{n}$
+
+### Generalized Linear Models with the Exclusive Lasso Penalty
+
+The above methods can be generalized to arbitrary generalized linear models,
+though the `ExclusiveLasso` package only currently supports binomial (logistic)
+and Poisson GLMs. We implement a proximal gradient method with back-tracking,
+similar to that used for Gaussian linear models, which we describe below.
+
+Before we describe the algorithm in detail, we note a useful general result
+which covers all the GLMs we consider in this package^[In particular, we restrict
+our attention to canonical link functions, natural parameterizations, and
+non-overdispersed sampling distributions.] (proof below):
+
+- The gradient of the negative log-likelihood can be written as:
+  \[\nabla_{\beta} \ell = -\bX^T (\bW/n) (\by - \bmu) \in \mathbb{R}^{p}\]
+
+where $\bX$ is the design matrix, $\bW$ is a diagonal matrix of observation
+weights, $\by$ is the vector of responses, and $\bmu$ is the vector of predicted
+responses, which is of the form $g(\bX\beta + \bo)$ for some function $g$ which
+depends on the GLM family being considered.
+
+To show this, we recall that the general negative log-likelihood for a GLM
+can be written as:
+\[\ell = \frac{1}{n}\sum_{i=1}^n w_i l(y_i; \bx_i^T\beta + o_i)\]
+where $l$ comes from the negative log-likehood of an an exponential family
+distribution and hence has the form:
+\[l_i = b(\bx_i^T\beta + o_i) - y_i * (\bx_i^T\beta + o_i)\]
+Taking derivatives with respect to $\beta_j$, we see that
+\[\frac{\partial l_i}{\partial \beta_j} = b'(\bx_i^T \beta + o_i)x_{ij} - y_ix_{ij}\]
+Writing this out in a vector form, we see that
+\[\nabla_{\beta} l_i = b'(\bx_i\beta + o_i)\bx_i^T - y_i \bx_i^T = \bx_i^T \left[b'(\bx_i^T\beta + o_i) - y_i\right]\]
+Hence, since $\ell$ is just a weighted sum of $l_i$, we get
+\[\nabla_{\beta} \ell = \frac{1}{n}\sum_{i=1} w_i \nabla_{\beta} l_i = \bX^T\bW\left[b'(\bX\beta + \bo) - y\right]/n = -\bX^T(\bW/n)(\bmu - \by)\]
+which shows that $b'$ is just $g$ from above.
+
+We can recover the classical Gaussian result by taking $b(x) = \frac{1}{2}x^2$,
+which gives $g(x) = b'(x) = x$. This, in turn, gives the stationary conditions
+\[\nabla_{\beta}\ell = \bX^T(\bW/n)\left[\bX\beta + \bo - \by\right] = 0 \implies \beta = (\bX^T\bW\bX)^{-1}\bX^T\bW(\by - \bo)\]
+as one would expect.
+
+For logistic regression, we take $b(x) = \log(1 + e^x)$, and so we
+recover \[g(x) = b'(x) = \frac{e^x}{1+e^x} = \frac{1}{1+e^{-x}}\] which
+maps the real line to the $[0, 1]$ interval.
+
+Finally, for Poisson regression, we take $b(x) = \exp(x)$, and so we recover
+\[g(x) = b'(x) = e^x\] which maps the real line to the positive half-line.
+
+#### Proximal Gradient Algorithm
+
+The proximal gradient algorithm that we use for GLMs is similar to that for the
+Gaussian case, but we introduce a back-tracking step instead of using a fixed
+step size. In particular, we use the back-tracking scheme described by Beck and
+Teboulli [-@Beck:2010], which also appears in Section 4.2 of Parikh and Boyd
+[-@Parikh:2014]. The treatment of the unpenalized intercept term is not as simple
+for generalized linear models (since we do not have a closed form for the intercept
+in terms of the residuals), so we instead include it as an unpenalized column of
+$\bX$ if an intercept appears in the model.
+
+The final algorithm is then:
+
+1. Initialize
+    - $\beta^{(0)} = 0$
+    - $L = \lambda_{\text{max}}(\bX^T\bW\bX/n)^{-1}$
+    - $k = 1$
+2. Repeat Until Convergence:
+    - Set: $t = L$
+    - Calculate $\nabla \beta^{(k-1)} = -\bX^T(\bW/n)(g(\bX^T\beta^{(k-1)} + \bo) - \by)$
+    - Repeat:
+        - Let $\bz = \textsf{prox}_{t \lambda}(\beta^{(k-1)} - t \nabla \beta^{(k-1)})$
+        - If $\ell(z) \leq \ell(\beta^{(0)}) + \langle \nabla \beta^{(k-1)}, z - \beta^{(k-1)} \rangle + \frac{1}{2t} \|z - \beta^{(k-1)}\|_2^2$:
+            - \textsf{break}
+        - Else:
+            - Set $t = \alpha * t$^[The value of $\alpha$ here defaults to $0.8$ and
+            is controlled by the macro `EXLASSO_BACKTRACK_BETA`]
+    - Set: $\beta^{(k)} = z$, $k: = k + 1$
+
+where $\ell$ is the smooth part (loss) of the objective function, and the proximal
+operator is evaluated using the coordinate-descent scheme described above.
 
 ## Stationary Conditions
 
@@ -404,7 +488,7 @@ strictly positive definite so the pseudo-inverse becomes the standard inverse.]
 ## Benchmarks
 
 We implement a few benchmarks to demonstrate the speed of the coordinate-descent
-algorithm used in the `ExclusiveLasso` package. 
+algorithm used in the `ExclusiveLasso` package.
 
 
 ```{r include=FALSE, echo=FALSE}

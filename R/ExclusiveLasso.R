@@ -1,3 +1,7 @@
+GLM_FAMILIES <- c(gaussian=0,
+                  binomial=1,
+                  poisson=2)
+
 #' Fit a GLM with Exclusive Lasso Regularization
 #'
 #' Fit a generalized linear model via maximum penalized likelihood
@@ -96,11 +100,13 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     ##
     ####################
 
-    nobs <- NROW(X); nvars <- NCOL(X);
+    nobs <- NROW(X);
+    nvars <- NCOL(X);
 
     if(length(y) != nobs){
         stop(sQuote("NROW(X)"), " and ", sQuote("length(y)"), " must match.")
     }
+
     if(length(groups) != nvars){
         stop(sQuote("NCOL(X)"), " and ", sQuote("length(groups)"), " must match.")
     }
@@ -109,14 +115,34 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         stop(sQuote("exclusive_lasso"), " does not support missing data.")
     }
 
+    if(!all(is.finite(X))){
+        stop("All elements of ", sQuote("X"), " must be finite.")
+    }
+
+    if(!all(is.finite(y))){
+        stop("All elements of ", sQuote("y"), " must be finite.")
+    }
+
     ## Index groups from 0 to `num_unique(groups) - 1` to represent
     ## in a arma::ivec
     groups <- match(groups, unique(groups)) - 1
 
     family <- match.arg(family)
 
-    if(family != "gaussian"){
-        stop(sQuote("exclusive_lasso"), " currently only supports the ", sQuote("gaussian"), " family.")
+    if(family == "poisson"){
+        stop("Poisson not yet implemented.")
+    }
+
+    if(family == "poisson"){
+        if(any(y < 0)){
+            stop(sQuote("y"), " must be non-negative for Poisson regression.")
+        }
+    }
+
+    if(family == "binomial"){
+        if(any(y < 0) || any(y > 1)){
+            stop(sQuote("y"), " must be in [0, 1] for logistic regression.")
+        }
     }
 
     if(missing(weights)){
@@ -151,6 +177,10 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         Xsc <- scale(X, center=TRUE, scale=TRUE)
         X_scale <- attr(Xsc, "scaled:scale", exact=TRUE)
         X_center <- attr(Xsc, "scaled:center", exact=TRUE)
+
+        if(!all(is.finite(Xsc))){
+            stop("Non-finite ", sQuote("X"), " found after standardization.")
+        }
     } else {
         Xsc <- X
         X_scale <- rep(1, nvars)
@@ -171,7 +201,7 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     }
 
     if(is.unsorted(lambda)){
-        warning("User-supplied ", sQuote("lambda"), " is not increasing Sorting for maximum performance.")
+        warning("User-supplied ", sQuote("lambda"), " is not increasing. Sorting for maximum performance.")
         lambda <- sort(lambda)
     }
 
@@ -185,15 +215,27 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
 
     algorithm <- match.arg(algorithm)
 
-    if(algorithm == "cd"){
-        res <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
-                                           lambda=lambda, w=weights, o=offset,
-                                           thresh=thresh, intercept=intercept)
+    if((family == "gaussian") && getOption("ExclusiveLasso.gaussian_fast_path", TRUE)){
+        if(algorithm == "cd"){
+            res <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
+                                               lambda=lambda, w=weights, o=offset,
+                                               thresh=thresh, intercept=intercept)
+        } else {
+            res <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
+                                               lambda=lambda, w=weights, o=offset,
+                                               thresh_prox=thresh_prox, thresh=thresh,
+                                               intercept=intercept)
+        }
     } else {
-        res <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
-                                           lambda=lambda, w=weights, o=offset,
-                                           thresh_prox=thresh_prox, thresh=thresh,
-                                           intercept=intercept)
+        if(algorithm == "cd"){
+            stop("Coordinate Descent for GLMs not yet implemented!")
+        }
+
+        res <- exclusive_lasso_glm_pg(X=Xsc, y=y, group=groups,
+                                      lambda=lambda, w=weights, o=offset,
+                                      family=GLM_FAMILIES[family],
+                                      thresh=thresh, thresh_prox=thresh_prox,
+                                      intercept=intercept)
     }
 
     ## Convert intercept to R vector (arma::vec => R column vector)
@@ -256,6 +298,7 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
                    offset=offset,
                    family=family,
                    df=df,
+                   algorithm=algorithm,
                    nnz=apply(res$coef, 2, function(x) sum(x != 0)),
                    time=Sys.time() - tic)
 
@@ -292,6 +335,8 @@ print.ExclusiveLassoFit <- function(x, ..., indent=0){
     icat("  - Family:        ", capitalize_string(x$family), "\n", indent=indent)
     icat("  - Intercept:     ", has_intercept(x), "\n", indent=indent)
     icat("  - Standardize X: ", x$standardize, "\n", indent=indent)
+    icat("  - Algorithm:     ", switch(x$algorithm, pg="Proximal Gradient", cd="Coordinate Descent"),
+         "\n", indent=indent)
     icat("\n", indent=indent)
     icat("Time: ", sprintf("%2.3f %s", x$time, attr(x$time, "units")), "\n", indent=indent)
     icat("\n", indent=indent)
@@ -448,9 +493,9 @@ predict.ExclusiveLassoFit <- function(object, newx, lambda=s, s=NULL,
     } else {
         ## Returning response
         switch(object$family,
-           gaussian=link,
-           binomial=inv_logit(link),
-           poisson=exp(link))
+               gaussian=link,
+               binomial=inv_logit(link),
+               poisson=exp(link))
     }
 }
 

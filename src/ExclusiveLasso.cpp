@@ -259,6 +259,18 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
             arma::vec linear_predictor = X1 * beta + o;
             return -X1.t() * arma::diagmat(w/n) * (y - inv_logit(linear_predictor))/n;
         };
+    } else if(family == EXLASSO_GLM_FAMILY_POISSON){
+        // TODO -- can we write this in a way that doesn't compute
+        //         linear_predictor redundantly?
+        f = [&](const arma::vec& beta){
+            arma::vec linear_predictor = X1 * beta + o;
+            return arma::dot(w/n, y % linear_predictor - arma::exp(linear_predictor));
+        };
+
+        g = [&](const arma::vec& beta){
+            arma::vec linear_predictor = X1 * beta + o;
+            return -X1.t() * arma::diagmat(w/n) * (y - arma::exp(linear_predictor))/n;
+        };
     } else {
         Rcpp::stop("[exclusive_lasso_glm] Unrecognized GLM family code.");
     }

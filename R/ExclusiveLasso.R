@@ -130,10 +130,6 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     family <- match.arg(family)
 
     if(family == "poisson"){
-        stop("Poisson not yet implemented.")
-    }
-
-    if(family == "poisson"){
         if(any(y < 0)){
             stop(sQuote("y"), " must be non-negative for Poisson regression.")
         }

@@ -79,6 +79,11 @@ colnames(X) <- paste0(ifelse(beta != 0, "T", "F"), 1:p)
 y <- X %*% beta + rnorm(n)
 
 exfit <- exclusive_lasso(X, y, groups=groups)
+print(exfit)
+```
+
+```{r}
+plot(exfit)
 ```
 
 Here we have significant correlation both within and between groups, but the

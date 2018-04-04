@@ -19,96 +19,96 @@ test_that("Input validation works", {
 
     expect_silent(exclusive_lasso(X, y, groups=groups,
                                   weights=weights, offset=offset,
-                                  lambda=lambda, family="binomial", algorithm="pg",
+                                  lambda=lambda, family="binomial",
                                   thresh=thresh, thresh_prox=thresh_prox))
 
     ## Wrong domain for y
     expect_error(exclusive_lasso(X, y  + 3, groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
 
     expect_error(exclusive_lasso(X, y  - 3, groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
 
     ## X, y match
     expect_error(exclusive_lasso(X, rep(y, 2), groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
 
     expect_error(exclusive_lasso(X, rep(y, length.out=n-1), groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
 
     ## groups check
     expect_error(exclusive_lasso(X, y,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=rep(groups, 2),
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
 
     ## Weights check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=rep(weights, 3), offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights= -1 * weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights= 0 * weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_warning(exclusive_lasso(X, y, groups=groups,
                                    weights= 2 * weights, offset=offset,
-                                   lambda=lambda, family="binomial", algorithm="pg",
+                                   lambda=lambda, family="binomial",
                                    thresh=thresh, thresh_prox=thresh_prox))
 
     ## Offsets check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=rep(offset, 2),
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
 
     ## Convergence thresholds check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=-1 * thresh, thresh_prox=thresh_prox))
 
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=lambda, family="binomial", algorithm="pg",
+                                 lambda=lambda, family="binomial",
                                  thresh=thresh, thresh_prox=-1 * thresh_prox))
 
     ## Lambda check
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
-                                 nlambda=-30, family="binomial", algorithm="pg",
+                                 nlambda=-30, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
-                                 nlambda=0, family="binomial", algorithm="pg",
+                                 nlambda=0, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda=-lambda, family="binomial", algorithm="pg",
+                                 lambda=-lambda, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_error(exclusive_lasso(X, y, groups=groups,
                                  weights=weights, offset=offset,
-                                 lambda.min.ratio=2, family="binomial", algorithm="pg",
+                                 lambda.min.ratio=2, family="binomial",
                                  thresh=thresh, thresh_prox=thresh_prox))
     expect_warning(exclusive_lasso(X, y, groups=groups,
                                    weights=weights, offset=offset,
-                                   lambda=rev(lambda), family="binomial", algorithm="pg",
+                                   lambda=rev(lambda), family="binomial",
                                    thresh=thresh, thresh_prox=thresh_prox))
 
 })
@@ -125,7 +125,7 @@ test_that("Dynamic defaults work", {
     groups <- rep(1:g, length.out=p)
 
     elfit <- exclusive_lasso(X, y, groups,
-                             family="binomial", algorithm="pg",
+                             family="binomial",
                              thresh_prox=1e-2, thresh=1e-2)
 
     expect_true(all(elfit$weights == 1))
@@ -152,7 +152,6 @@ test_that("Preserves column names", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              family="binomial",
-                             algorithm="pg",
                              thresh_prox=1e-2,
                              thresh=1e-2)
 
@@ -180,14 +179,12 @@ test_that("Standardization works", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              family="binomial",
-                             algorithm="pg",
                              thresh_prox=1e-8,
                              thresh=1e-8)
 
     elfit_sc <- exclusive_lasso(X_sc, y, groups,
                                 lambda=elfit$lambda,
                                 family="binomial",
-                                algorithm="pg",
                                 standardize=FALSE,
                                 thresh_prox=1e-8,
                                 thresh=1e-8)
@@ -199,6 +196,25 @@ test_that("Standardization works", {
     expect_equal(elfit$coef,
                  elfit_sc$coef / attr(scale(X), "scaled:scale"))
 
+})
+
+test_that("CD and PG get the same answer", {
+    set.seed(180)
+
+    n <- 200
+    p <- 50
+    groups <- rep(1:5, 10)
+
+    beta <- rep(0, p)
+    beta[1:5] <- 3
+
+    X <- matrix(rnorm(n * p), ncol=p)
+    y <- plogis(X %*% beta)
+
+    fit1 <- exclusive_lasso(X, y, groups, family="binomial", algorithm="pg",
+                            nlambda=10, thresh=1e-10, thresh_prox=1e-10)
+    fit2 <- exclusive_lasso(X, y, groups, family="binomial", algorithm="cd",
+                            nlambda=10, thresh=1e-10, thresh_prox=1e-10)
 })
 
 test_that("GLM PG works correctly", {

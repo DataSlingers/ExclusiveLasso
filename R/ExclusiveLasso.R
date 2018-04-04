@@ -224,14 +224,18 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         }
     } else {
         if(algorithm == "cd"){
-            stop("Coordinate Descent for GLMs not yet implemented!")
+            res <- exclusive_lasso_glm_cd(X=Xsc, y=y, group=groups,
+                                          lambda=lambda, w=weights, o=offset,
+                                          family=GLM_FAMILIES[family],
+                                          thresh=thresh, thresh_prox=thresh_prox,
+                                          intercept=intercept)
+        } else {
+            res <- exclusive_lasso_glm_pg(X=Xsc, y=y, group=groups,
+                                          lambda=lambda, w=weights, o=offset,
+                                          family=GLM_FAMILIES[family],
+                                          thresh=thresh, thresh_prox=thresh_prox,
+                                          intercept=intercept)
         }
-
-        res <- exclusive_lasso_glm_pg(X=Xsc, y=y, group=groups,
-                                      lambda=lambda, w=weights, o=offset,
-                                      family=GLM_FAMILIES[family],
-                                      thresh=thresh, thresh_prox=thresh_prox,
-                                      intercept=intercept)
     }
 
     ## Convert intercept to R vector (arma::vec => R column vector)

@@ -82,10 +82,6 @@ exfit <- exclusive_lasso(X, y, groups=groups)
 print(exfit)
 ```
 
-```{r}
-plot(exfit)
-```
-
 Here we have significant correlation both within and between groups, but the
 correlation is highest between the 5 true positives.
 
@@ -407,6 +403,96 @@ The final algorithm is then:
 where $\ell$ is the smooth part (loss) of the objective function, and the proximal
 operator is evaluated using the coordinate-descent scheme described above.
 
+#### Coordinate Descent Algorithm
+
+In addition to the proximal gradient scheme, we can also employ a (variant of the)
+(inexact) proximal Newton method [@Lee:2014]. This method, sometimes also called a
+*successive quadratic approximation* approach [@Byrd:2016], works by replacing the
+smooth portion of the objective function (the  negative log-likelihood) with a
+quadratic approximation and minimizing the approximation, typically with an iterative
+algorithm. Once the inner algorithm converges, the approximation is updated and the
+process is repeated until convergence. This method has been applied to great effect in
+the `glmnet` package for $\ell_1$-penalized GLMs [@Friedman:2010].
+
+Quadratic approximation methods are particularly attractive for generalized
+linear models because they reduce to solving a series of penalized
+weighted linear regression problems (similar to the IRLS method which solves
+unpenalized GLMs by successively fitting weighted least squares) and allow us
+to use the efficient algorithm we have already developed for the linear case,
+namely coordinate descent. Like `glmnet`, we do not use a back-tracking rule
+to guarantee descent.
+
+Solving the exact quadratic approximation is computationally expensive, so we 
+instead use an approximate Hessian, obtained by taking the diagonal of the true
+Hessian. This scheme has been used in `glmnet` for fitting the penalized Cox
+model [@Simon:2011, Section 2.1] effectively, but lacks formal justification.
+
+To implement this strategy, we need to calculate the gradient and the diagonal of
+the Hessian of the negative log-likelihood with respect *to the linear predictor*
+(not with respect to the regression coefficients): this calculation turns out
+to be slightly simpler than the calculations above. Under the same assumptions
+as before, we have: 
+
+\[\ell = \frac{1}{n}\sum_{i=1}^n w_i \left[b(\eta_i) - y_i * \eta_i\right]\]
+
+so 
+
+\[\frac{\partial \ell}{\partial \eta_i} = \frac{w_i}{n}\left[b'(\eta_i) - y_i\right]\]
+
+and 
+
+\[\frac{\partial^2 \ell}{\partial \eta_i^2} = \frac{w_i}{n}b''(\eta_i)\]
+
+For the GLM families we considered above, we have: 
+
+- Gaussian: $b(x) = \frac{1}{2}x^2$ so $b'(x) = x$ and $b''(x) = 1$, giving 
+  \[\frac{\partial \ell}{\partial \eta_i} = = \frac{w_i}{n}(\eta_i - y_i) = \frac{w_i}{n}(\bx_i^T\beta + \alpha + o_i - y_i)\] and 
+  \[\frac{\partial^2 \ell}{\partial \eta_i^2} = \frac{w_i}{n}\] 
+  as we would expect
+- Logistic: $b(x) = \log(1+e^x)$ gives $b'(x) = (1 + e^{-x})^{-1}$ and 
+  $b''(x) = b'(x)(1 - b'(x))$ so
+  \[\frac{\partial \ell}{\partial \eta_i} = \frac{w_i}{n}\left(\frac{1}{1+e^{-\eta_i}} - y_i\right)\] and 
+  \[\frac{\partial^2 \ell}{\partial \eta_i^2} = \frac{w_i}{n}\left(1 - \frac{1}{1+e^{-\eta_i}}\right)\left(\frac{1}{1+e^{-\eta_i}}\right)\] 
+- Poisson: $b(x) = \exp(x)$ gives $b'(x) = b''(x) = \exp(x)$ so 
+  \[\frac{\partial \ell}{\partial \eta_i} = \frac{w_i}{n}\left(e^{\eta_i} - y_i\right)\] and 
+  \[\frac{\partial^2 \ell}{\partial \eta_i^2} = \frac{w_i}{n}e^{\eta_i}\] 
+    
+We plug these results into the inexact successive quadratic approximation
+algorithm to obtain: 
+
+1. Initialize
+    - $\beta^{(0)} = 0$
+    - $\alpha^{(0)} = 0$
+    - $\eta^{(0)} = X\beta^{(0)} + \alpha^{(0)} + \bo = \bo$
+    - $z(\eta^{(0)})_j =\bo - \frac{\partial \ell / \partial \beta_j}{\partial^2 \ell / \partial \beta_j^2}$
+    - $\omega_j^{(0)} = w_j/n * \frac{\partial^2 \ell}{\partial \beta_j^2}$
+    - $\br = z(\eta^{(0)}) - (X\beta + \alpha^{(0)} + \bo) = z(\eta^{(0)}) - \bo$
+    - $k = 1$
+2. Repeat Until Convergence:
+    - Coordinate descent loop: 
+        - Precompute: $\bu = \text{diag}(\bX^T\Omega\bX)$
+        - For $i \in [p]$:
+            - Update working residual: $\br: \br + \bX_i\beta_i$
+            - Set $z = \br^T\Omega \bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g, -i}\|_1$
+            - Update:
+              \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(z)\]
+            - Update working residual: $\br := \br - \bX_i\beta_i + \alpha 1_{n}$
+        - Update intercept: $\alpha := \langle \br, \text{diag}(\Omega)/n \rangle$
+        - Update working residual: $\br := \br - \alpha 1_{n}$
+    - Update quadratic approximation:
+        - $\beta^{(k)} = \beta$
+        - $\alpha^{(k)} = \alpha$
+        - $\eta^{(k)} = X\beta^{(k)} + \alpha^{(k)} + \bo$
+        - $z(\eta^{(k)})_j = \eta^{(k)}_j - \frac{\partial \ell / \partial \beta_j}{\partial^2 \ell / \partial \beta_j^2}$
+        - $\omega_j^{(k)} = w_j * \frac{\partial^2 \ell}{\partial \beta_j^2}$
+        - $\br = z(\eta^{(k)}) - X\beta^{(k)} - \alpha^{(k)} - \bo$
+    - Set $k: = k + 1$
+
+We note that the inner loop of this algorithm is essentially just our coordinate
+descent loop from above, but with weights $\Omega$ instead of $\bW$. Unlike the
+algorithm above, however, after each coordiante descent iteration, we update the
+weights $\Omega$, as well as the working response $z$ and residuals. 
+
 ## Stationary Conditions
 
 In this section, we derive and re-state some of the stationarity conditions
@@ -424,7 +510,6 @@ Clearly, this separates group-wise so we first consider the single group case:
 If $\beta_{i}$ is non-zero, then $P$ is differentiable with respect to $\beta_i$ and
 the subdifferential is given by the classical derivative:
 \[\partial_{\beta_i} P(\beta_g) = \frac{1}{2} 2 *\left(|\beta_i| + \|\beta_{-i}\|_1\right) * \sign(\beta_i) = \sign(\beta_i) \|\beta_g\|_1\]
-
 
 If $\beta_{i}$ is zero, the subdifferential can be evaluted similarly, using
 the well-known subdifferential of the absolute value operator at zero:

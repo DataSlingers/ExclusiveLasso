@@ -376,7 +376,7 @@ Finally, for Poisson regression, we take $b(x) = \exp(x)$, and so we recover
 The proximal gradient algorithm that we use for GLMs is similar to that for the
 Gaussian case, but we introduce a back-tracking step instead of using a fixed
 step size. In particular, we use the back-tracking scheme described by Beck and
-Teboulli [-@Beck:2010], which also appears in Section 4.2 of Parikh and Boyd
+Teboulle [-@Beck:2010], which also appears in Section 4.2 of Parikh and Boyd
 [-@Parikh:2014]. The treatment of the unpenalized intercept term is not as simple
 for generalized linear models (since we do not have a closed form for the intercept
 in terms of the residuals), so we instead include it as an unpenalized column of

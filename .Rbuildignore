@@ -13,3 +13,4 @@
 ## GH files (not part of package)
 .gitignore.deploy
 README.Rmd
+^data-raw$

@@ -544,47 +544,38 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
     // 2) l2 -- diagonal of Hessian of smooth portion of objective function.
     //          Used to weight entries
     //
-    // Both take a vector (beta == coefficients) and double (alpha = intercept) as input
+    // Both take a vector (eta == linear predictor = X*beta + alpha + o) as input
     //
     // In many of these, we force evaluation of the return object
     // (which would otherwise be calculated lazily) to avoid a nasty segfault
     // resulting from un-mapped memory
 
-    std::function<arma::vec(const arma::vec&, double)> l1;
-    std::function<arma::vec(const arma::vec&, double)> l2;
+    std::function<arma::vec(const arma::vec&)> l1;
+    std::function<arma::vec(const arma::vec&)> l2;
 
     if(family == EXLASSO_GLM_FAMILY_GAUSSIAN){
-        l1 = [&](const arma::vec& beta, double alpha){
-            arma::vec linear_predictor = X*beta + o + alpha;
-            return (w/n % (linear_predictor - y)).eval();
+        l1 = [&](const arma::vec& eta){
+            return ((eta - y)).eval();
         };
 
-        l2 = [&](const arma::vec& beta, double alpha){
-            return (w / n).eval();
+        l2 = [&](const arma::vec& eta){
+            return (arma::vec(eta.n_elem, arma::fill::ones)).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_LOGISTIC) {
-        // TODO -- can we write this in a way that doesn't compute
-        //         linear_predictor redundantly?
-        l1 = [&](const arma::vec& beta, double alpha){
-            arma::vec linear_predictor = X * beta + o + alpha;
-            return (w/n % (inv_logit(linear_predictor) - y)).eval();
+        l1 = [&](const arma::vec& eta){
+            return ((inv_logit(eta) - y)).eval();
         };
 
-        l2 = [&](const arma::vec& beta, double alpha){
-            arma::vec linear_predictor = X * beta + o + alpha;
-            return (w/n % (inv_logit(linear_predictor)) % (1 - inv_logit(linear_predictor))).eval();
+        l2 = [&](const arma::vec& eta){
+            return ((inv_logit(eta)) % (1 - inv_logit(eta))).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_POISSON){
-        // TODO -- can we write this in a way that doesn't compute
-        //         linear_predictor redundantly?
-        l1 = [&](const arma::vec& beta, double alpha){
-            arma::vec linear_predictor = X * beta + o + alpha;
-            return (w/n % (arma::exp(linear_predictor) - y)).eval();
+        l1 = [&](const arma::vec& eta){
+            return ((arma::exp(eta) - y)).eval();
         };
 
-        l2 = [&](const arma::vec& beta, double alpha){
-            arma::vec linear_predictor = X * beta + o + alpha;
-            return (w/n % arma::exp(linear_predictor)).eval();
+        l2 = [&](const arma::vec& eta){
+            return (arma::exp(eta)).eval();
         };
     } else {
         Rcpp::stop("[exclusive_lasso_glm] Unrecognized GLM family code.");
@@ -594,11 +585,11 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
     double alpha = 0;
     arma::vec eta = o;
 
-    arma::vec l1_vec = l1(beta_working, alpha);
-    arma::vec l2_vec = l2(beta_working, alpha);
+    arma::vec l1_vec = l1(eta);
+    arma::vec l2_vec = l2(eta);
 
     arma::vec z = o - l1_vec / l2_vec;
-    arma::vec omega = w / n % l2_vec;
+    arma::vec omega = l2_vec % w;
     arma::vec r = z - o;
 
     // Like the working residual, we also store a working copy of
@@ -641,6 +632,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
         double nl = n * lambda(i);
 
         do{ // Outer SQA Loop
+            beta_sqa_old = beta_working;
             arma::vec u(p);
             for(uint i=0; i<p; i++){
                 u(i) = arma::sum(arma::square(X.col(i)) % omega);
@@ -661,10 +653,10 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                     uint g = groups(j);
                     g_norms(g) -= fabs(beta);
 
-                    double z = arma::dot(r % omega, xj);
+                    double z1 = arma::dot(r % omega, xj);
                     double lambda_til = nl * g_norms(g);
 
-                    beta = soft_thresh(z, lambda_til) / (u(j) + nl);
+                    beta = soft_thresh(z1, lambda_til) / (u(j) + nl);
                     r -= xj * beta;
                     g_norms(g) += fabs(beta);
 
@@ -701,14 +693,13 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
             full_loop_count = 0;
 
             // Update SQA
-            beta_sqa_old = beta_working;
             eta = X * beta_working + alpha + o;
-            l1_vec = l1(beta_working, alpha);
-            l2_vec = l2(beta_working, alpha);
+            l1_vec = l1(eta);
+            l2_vec = l2(eta);
 
             z = eta - l1_vec / l2_vec;
-            omega = w / n % l2_vec;
-            r = z - X * beta_working - o - alpha;
+            omega = l2_vec % w;
+            r = (z - eta);
 
             K += 1;
             if((K % EXLASSO_CHECK_USER_INTERRUPT_RATE_GLM) == 0){

@@ -217,7 +217,7 @@ test_that("CD and PG get the same answer", {
                             nlambda=10, thresh=1e-10, thresh_prox=1e-10)
 })
 
-test_that("GLM PG works correctly", {
+test_that("GLM PG gets the same result as Gaussian PG", {
     ## Compare to Gaussian case
     set.seed(45)
     n <- 200
@@ -233,17 +233,39 @@ test_that("GLM PG works correctly", {
 
     fit1 <- exclusive_lasso(X, y, groups, algorithm="pg",
                             thresh=1e-10, thresh_prox=1e-10)
-    fit2 <- exclusive_lasso(X, y, groups, algorithm="cd",
-                            thresh=1e-10, thresh_prox=1e-10)
 
     options(ExclusiveLasso.gaussian_fast_path = FALSE)
 
-    fit3 <- exclusive_lasso(X, y, groups, algorithm="pg",
+    fit2 <- exclusive_lasso(X, y, groups, algorithm="pg",
                             thresh=1e-10, thresh_prox=1e-10)
 
     ## Reset this
     options(Exclusive_lasso.gaussian_fast_path = TRUE)
+})
 
-    expect_equal(coef(fit1), coef(fit2))
-    expect_equal(coef(fit1), coef(fit3))
+
+test_that("GLM CD gets the same result as Gaussian CD", {
+    ## Compare to Gaussian case
+    set.seed(545)
+    n <- 100
+    p <- 40
+
+    groups <- rep(1:4, length.out=p)
+
+    X <- matrix(rnorm(n * p), ncol=p)
+    beta <- rep(0, p); beta[1:4] <- 3
+    y <- X %*% beta + rnorm(n)
+
+    options(ExclusiveLasso.gaussian_fast_path = TRUE)
+
+    fit1 <- exclusive_lasso(X, y, groups, algorithm="cd",
+                            thresh=1e-10, thresh_prox=1e-10)
+
+    options(ExclusiveLasso.gaussian_fast_path = FALSE)
+
+    fit2 <- exclusive_lasso(X, y, groups, algorithm="cd",
+                            thresh=1e-10, thresh_prox=1e-10)
+
+    ## Reset this
+    options(Exclusive_lasso.gaussian_fast_path = TRUE)
 })

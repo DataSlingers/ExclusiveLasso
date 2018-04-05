@@ -23,8 +23,8 @@ GLM_FAMILIES <- c(gaussian=0,
 #' @param y The response vector (\eqn{y})
 #' @param groups An integer vector of length \eqn{p} indicating group membership.
 #'     (Cf. the \code{group} argument of \code{\link[grpreg]{grpreg}})
-#' @param family The GLM response type. Currently only \code{family="gaussian"}
-#'     is implemented. (Cf. the \code{family} argument of \code{\link[stats]{glm}})
+#' @param family The GLM response type. (Cf. the \code{family} argument of
+#'               \code{\link[stats]{glm}})
 #' @param weights Weights applied to individual
 #'     observations. If not supplied, all observations will be equally
 #'     weighted. Will be re-scaled to sum to \eqn{n} if
@@ -55,6 +55,10 @@ GLM_FAMILIES <- c(gaussian=0,
 #'    to be faster for most problems (consistent with Campbell and Allen), but
 #'    proximal gradient may be faster for certain problems with many small groups
 #'    where the proximal operator may be evaluated quickly and to high precision.
+#' @details By default, an optimized implementation is used for \code{family="gaussian"}
+#'          which is approximately 2x faster for most problems. If you wish
+#'          to disable this code path and use the standard GLM implementation
+#'          with Gaussian response, set \code{options(ExclusiveLasso.gaussian_fast_path=FALSE).}
 #' @examples
 #' n <- 200
 #' p <- 500

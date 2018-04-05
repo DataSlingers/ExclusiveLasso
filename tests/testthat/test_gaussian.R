@@ -357,7 +357,7 @@ test_that("Matches closed form solution", {
     }
 })
 
-test_that("Two algorithms give the same result",{
+test_that("Gaussian fast path CD + PG algorithms give the same result",{
     set.seed(1559)
     n <- 200
     p <- 500

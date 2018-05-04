@@ -225,7 +225,6 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
 
     arma::vec beta(p, arma::fill::zeros);
     arma::vec beta_old(p);
-    double alpha = 0;
 
     // Define helper functions for GLM Prox Gradient
     //
@@ -260,7 +259,7 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
 
         g = [&](const arma::vec& beta){
             arma::vec linear_predictor = X1 * beta + o;
-            return (-X1.t() * arma::diagmat(w/n) * (y - inv_logit(linear_predictor))/n).eval();
+            return (-X1.t() * arma::diagmat(w/n) * (y - inv_logit(linear_predictor))).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_POISSON){
         // TODO -- can we write this in a way that doesn't compute

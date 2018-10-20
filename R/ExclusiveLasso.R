@@ -262,29 +262,10 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
 
     ## Degrees of freedom -- calculated using original scale matrix
     ## (though it shouldn't really matter)
-    ##
-    ## Loop over each solution and calculate M matrix
-    ## and from there DF
     if(!skip_df){
-        df <- rep(NA, length(lambda))
-        for(ix in seq(length(lambda), 1, by=-1)){
-            l <- lambda[ix]
-            S <- which(res$coef[,ix] != 0)
-            M <- matrix(0, nrow=nvars, ncol=nvars)
-
-            for(g in unique(groups)){
-                g_ix <- which(groups == g)
-                s_g <- sign(res$coef[g_ix, ix])
-                M[g_ix, g_ix] <- outer(s_g, s_g)
-            }
-
-            diag(M) <- diag(M) + 1e-4 ## For numerical stability in inverse step
-            X_S <- X[,S]
-            projection_mat <- X_S %*% solve(crossprod(X_S) + nobs * l * M[S, S], t(X_S))
-            df[ix] <- sum(diag(projection_mat))
-        }
+        df <- calculate_exclusive_lasso_df(X, lambda, groups, res$coef)
     } else {
-      df <- NULL
+        df <- NULL
     }
 
     if(!is.null(colnames(X))){

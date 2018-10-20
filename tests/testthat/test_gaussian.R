@@ -1,4 +1,5 @@
-context("Gaussian response GLM works")
+context("Gaussian response exclusive lasso works")
+## This focuses on the specialized gaussian fast path
 
 test_that("Input validation works", {
     set.seed(123)
@@ -357,7 +358,7 @@ test_that("Matches closed form solution", {
     }
 })
 
-test_that("Gaussian fast path CD + PG algorithms give the same result",{
+test_that("Gaussian CD + PG algorithms give the same result",{
     set.seed(1559)
     n <- 200
     p <- 500
@@ -479,7 +480,6 @@ test_that("Intercepts work", {
     expect_equal(apply(ym - o - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 10))
 })
-
 
 test_that("Estimation works in low-dim + low-penalty case", {
     set.seed(672)

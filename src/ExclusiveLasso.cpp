@@ -511,7 +511,8 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
 
     arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
                       Beta_storage_vec.subvec(0, beta_nnz - 1),
-                      p, n_lambda);
+                      p,
+                      n_lambda);
 
     if(intercept){
         return Rcpp::List::create(Rcpp::Named("intercept")=Alpha,
@@ -532,8 +533,17 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                                   double thresh_prox=1e-7,
                                   bool intercept=true){
 
-    arma::uword n = X.n_rows;
-    arma::uword p = X.n_cols;
+    arma::mat X1;
+
+    if(intercept){
+        arma::colvec one_vec = arma::ones(X.n_rows);
+        X1 = arma::join_rows(X, one_vec);
+    } else {
+        X1 = X;
+    }
+
+    arma::uword n = X1.n_rows;
+    arma::uword p = X1.n_cols;
     arma::uword n_lambda = lambda.n_elem;
 
     // Define helper functions for GLM SQA+CD
@@ -543,7 +553,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
     // 2) l2 -- diagonal of Hessian of smooth portion of objective function.
     //          Used to weight entries
     //
-    // Both take a vector (eta == linear predictor = X*beta + alpha + o) as input
+    // Both take a vector (eta == linear predictor = X*beta + o) as input
     //
     // In many of these, we force evaluation of the return object
     // (which would otherwise be calculated lazily) to avoid a nasty segfault
@@ -581,7 +591,6 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
     }
 
     arma::vec beta_working(p, arma::fill::zeros);
-    double alpha = 0;
     arma::vec eta = o;
 
     arma::vec l1_vec = l1(eta);
@@ -634,7 +643,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
             beta_sqa_old = beta_working;
             arma::vec u(p);
             for(uint i=0; i<p; i++){
-                u(i) = arma::sum(arma::square(X.col(i)) % omega);
+                u(i) = arma::sum(arma::square(X1.col(i)) % omega);
             }
 
             do { // Inner CD Loop
@@ -646,7 +655,19 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                         continue;
                     }
 
-                    const arma::vec xj = X.col(j);
+                    if(intercept & (j == p - 1)){
+                        // Don't need to threshold here, so simpler update
+                        const arma::vec xj = X1.col(j);
+
+                        r += xj * beta;
+                        beta = arma::dot(r % omega, xj) / n;
+                        r -= xj * beta;
+
+                        beta_working(j) = beta;
+                        continue;
+                    }
+
+                    const arma::vec xj = X1.col(j);
                     r += xj * beta;
 
                     uint g = groups(j);
@@ -660,12 +681,6 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                     g_norms(g) += fabs(beta);
 
                     beta_working(j) = beta;
-                }
-
-                if(intercept){
-                    r += alpha;
-                    alpha = arma::dot(r, omega/n);
-                    r -= alpha;
                 }
 
                 k++; // Increment CD loop counter
@@ -692,7 +707,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
             full_loop_count = 0;
 
             // Update SQA
-            eta = X * beta_working + alpha + o;
+            eta = X1 * beta_working + o;
             l1_vec = l1(eta);
             l2_vec = l2(eta);
 
@@ -719,24 +734,28 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
         // Load sparse matrix storage
         for(uint j=0; j < p; j++){
             if(beta_working(j) != 0){
-                // We want to have a coefficient matrix
-                // where rows are features and columns are values of lambda
-                //
-                // Armadillo's batch constructor takes (row, column) pairs
-                // so we build as  (j = feature, i = lambda_index)
-                Beta_storage_ind(0, beta_nnz) = j;
-                Beta_storage_ind(1, beta_nnz) = i;
-                Beta_storage_vec(beta_nnz) = beta_working(j);
-                beta_nnz += 1;
+                if(intercept && (j == p - 1)){
+                    // Handle intercept specially
+                    Alpha(i) = beta_working(j);
+                } else {
+                    // We want to have a coefficient matrix
+                    // where rows are features and columns are values of lambda
+                    //
+                    // Armadillo's batch constructor takes (row, column) pairs
+                    // so we build as  (j = feature, i = lambda_index)
+                    Beta_storage_ind(0, beta_nnz) = j;
+                    Beta_storage_ind(1, beta_nnz) = i;
+                    Beta_storage_vec(beta_nnz) = beta_working(j);
+                    beta_nnz += 1;
+                }
             }
         }
-
-        Alpha(i) = alpha;
     }
 
     arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
                       Beta_storage_vec.subvec(0, beta_nnz - 1),
-                      p, n_lambda);
+                      intercept ? p - 1 : p, // Drop column of X if intercept
+                      n_lambda);
 
     if(intercept){
         return Rcpp::List::create(Rcpp::Named("intercept")=Alpha,

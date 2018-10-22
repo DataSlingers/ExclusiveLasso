@@ -13,14 +13,18 @@ test_that("Gaussian GLM works with coordinate descent", {
 
     X <- matrix(rnorm(n * p), ncol=p)
     beta <- rep(0, p); beta[1:4] <- 3
+    weights <- rexp(n, 1); weights <- weights / sum(weights) * n
+    offset  <- runif(n, -0.25, 0.25)
     y <- X %*% beta + rnorm(n)
 
     options(ExclusiveLasso.gaussian_fast_path = TRUE)
     fit1 <- exclusive_lasso(X, y, groups, algorithm="cd",
+                            weights = weights, offset = offset,
                             thresh=1e-12, thresh_prox=1e-12)
 
     options(ExclusiveLasso.gaussian_fast_path = FALSE)
     fit2 <- exclusive_lasso(X, y, groups, algorithm="cd",
+                            weights = weights, offset = offset,
                             thresh=1e-12, thresh_prox=1e-12)
 
     ## Reset this
@@ -38,14 +42,18 @@ test_that("Gaussian GLM works with proximal gradient", {
 
     X <- matrix(rnorm(n * p), ncol=p)
     beta <- rep(0, p); beta[1:4] <- 3
+    weights <- rexp(n, 1); weights <- weights / sum(weights) * n
+    offset  <- runif(n, -0.25, 0.25)
     y <- X %*% beta + rnorm(n)
 
     options(ExclusiveLasso.gaussian_fast_path = TRUE)
     fit1 <- exclusive_lasso(X, y, groups, algorithm="pg",
+                            weights = weights, offset = offset,
                             thresh=1e-14, thresh_prox=1e-14)
 
     options(ExclusiveLasso.gaussian_fast_path = FALSE)
     fit2 <- exclusive_lasso(X, y, groups, algorithm="pg",
+                            weights = weights, offset = offset,
                             thresh=1e-14, thresh_prox=1e-14)
 
     ## Reset this

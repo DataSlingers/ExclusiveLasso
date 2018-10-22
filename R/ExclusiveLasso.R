@@ -59,6 +59,7 @@ GLM_FAMILIES <- c(gaussian=0,
 #'          which is approximately 2x faster for most problems. If you wish
 #'          to disable this code path and use the standard GLM implementation
 #'          with Gaussian response, set \code{options(ExclusiveLasso.gaussian_fast_path=FALSE).}
+#' @include internals.R
 #' @examples
 #' n <- 200
 #' p <- 500

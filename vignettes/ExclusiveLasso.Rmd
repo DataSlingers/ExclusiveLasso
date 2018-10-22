@@ -1,8 +1,15 @@
 ---
 title: "Introduction to the `ExclusiveLasso` Package"
-author: "Michael Weylandt"
+author:
+ - name: Michael Weylandt
+   affiliation: Department of Statistics, Rice University
+   email: michael.weylandt@rice.edu
 date: "2017-10-12"
-output: html_vignette
+output: 
+  html_document: 
+    toc: true
+    toc_float: 
+      collapsed: false
 bibliography: vignettes.bibtex
 vignette: >
   %\VignetteIndexEntry{Introduction to the ExclusiveLasso Package}
@@ -39,7 +46,7 @@ The `ExclusiveLasso` package implements the exclusive lasso penalty of Zhou *et
 al.* [-@Zhou:2010], which Obozinski and Bach showed is the tightest convex
 relaxation of the combinatorial constraint "exactly one non-zero element in each
 group" [-@Obozinski:2012, Section 4.2]. For the Gaussian case, we implement
-the two algorithms discussed in Campbell and Allen [@Campbell:2017]:
+the two algorithms discussed in Campbell and Allen [-@Campbell:2017]:
 
   - proximal gradient descent, with coordinate descent used to evaluate the
     proximal operator;
@@ -130,13 +137,18 @@ standard ridge penalty $\frac{\lambda}{2}\|\beta\|_2^2$.
 ### Proximal Gradient
 
 Campbell and Allen propose the use of a *proximal gradient* algorithm to solve
-Problem $\eqref{eq:el-gaussian}$. Proximal gradient algorithms, made popular in the
-sparse regression context by the "ISTA" algorithm of Beck and Teboulle [-@Beck:2009],
+Problem $\eqref{eq:el-gaussian}$. Proximal gradient algorithms, first proposed in the
+sparse regression context by the "ISTA" algorithm of Daubechies *et al.*
+[-@Daubechies:2004] and later popularized by Beck and Teboulle [-@Beck:2009],
 combine a gradient descent-type update for the smooth part of the objective with
 the proximal operator associated with the non-smooth part. They are particularly
 common for problems where the non-smooth part has a simple (or even closed form)
-solution. Proximal gradient have been applied to a wide-range of problems.
-See, *e.g.*,  Parikh and Boyd [-@Parikh:2014] for a review.
+solution.^[As will be shown below, the proximal operator of the Exclusive Lasso 
+problem is non-trivial and somewhat expensive to evaluate to high precision. For
+this reason, an accelerated proximal gradient ("FISTA") algorithm may be implemented
+in a future version of the `ExclusiveLasso` package.] Proximal gradient have been
+applied to a wide-range of problems. See, *e.g.*,  Parikh and Boyd
+[-@Parikh:2014] for a recent review.
 
 For a general penalized regression problem of the form
 \[\argmin_{\beta} f(\beta) + \lambda g(\beta)\]
@@ -205,7 +217,7 @@ Pulling the common $(1+c)^{-1}$ term out we get:
 
 #### Combined Algorithm
 
-Putting these pieces together, we get the following Exclusive Lasso algorithm
+Putting these pieces together, we get the following proximal gradient algorithm
 for $\eqref{eq:el-gaussian}$.
 
 1. Initialize
@@ -325,7 +337,9 @@ algorithm becomes:
         - Update intercept: $\alpha := \langle \br, \text{diag}(\bW)/n \rangle$
         - Update working residual: $\br := \br - \alpha 1_{n}$
 
-### Generalized Linear Models with the Exclusive Lasso Penalty
+## Generalized Linear Models with the Exclusive Lasso Penalty
+
+**ExclusiveLasso GLMs are currently buggy!**
 
 The above methods can be generalized to arbitrary generalized linear models,
 though the `ExclusiveLasso` package only currently supports binomial (logistic)
@@ -340,10 +354,14 @@ non-overdispersed sampling distributions.] (proof below):
 - The gradient of the negative log-likelihood can be written as:
   \[\nabla_{\beta} \ell = -\bX^T (\bW/n) (\by - \bmu) \in \mathbb{R}^{p}\]
 
-where $\bX$ is the design matrix, $\bW$ is a diagonal matrix of observation
-weights, $\by$ is the vector of responses, and $\bmu$ is the vector of predicted
-responses, which is of the form $g(\bX\beta + \bo)$ for some function $g$ which
-depends on the GLM family being considered.
+where:
+- $\bX$ is the design matrix;
+- $\bW$ is a diagonal matrix of observation weights; 
+- $\by$ is the vector of observed responses; and
+- $\bmu$ is the vector of predicted responses. 
+
+As we will see below, $\bmu$ typically has the simple form $g(\bX\beta + \bo)$, 
+where $g(\cdot)$ depends only on the GLM family being considered.
 
 To show this, we recall that the general negative log-likelihood for a GLM
 can be written as:
@@ -356,11 +374,14 @@ Taking derivatives with respect to $\beta_j$, we see that
 Writing this out in a vector form, we see that
 \[\nabla_{\beta} l_i = b'(\bx_i\beta + o_i)\bx_i^T - y_i \bx_i^T = \bx_i^T \left[b'(\bx_i^T\beta + o_i) - y_i\right]\]
 Hence, since $\ell$ is just a weighted sum of $l_i$, we get
-\[\nabla_{\beta} \ell = \frac{1}{n}\sum_{i=1} w_i \nabla_{\beta} l_i = \bX^T\bW\left[b'(\bX\beta + \bo) - y\right]/n = -\bX^T(\bW/n)(\bmu - \by)\]
+\[\nabla_{\beta} \ell = \frac{1}{n}\sum_{i=1} w_i \nabla_{\beta} l_i = \bX^T\bW\left[b'(\bX\beta + \bo) - \by\right]/n = -\bX^T(\bW/n)(\by - \mu)\]
 which shows that $b'$ is just $g$ from above.
 
-We can recover the classical Gaussian result by taking $b(x) = \frac{1}{2}x^2$,
-which gives $g(x) = b'(x) = x$. This, in turn, gives the stationary conditions
+We can recover the classical Gaussian model by taking $b(x) = \frac{1}{2}x^2$,
+which gives $g(x) = b'(x) = x$. This, in turn, gives the gradient 
+\[\nabla_{\beta}\ell = -\bX^T(\bW/n)(\by - \bX^T\beta - \bo)\] which we would 
+obtain by taking the gradient of the Gaussian loss directly. Solving the stationary
+conditions gives
 \[\nabla_{\beta}\ell = \bX^T(\bW/n)\left[\bX\beta + \bo - \by\right] = 0 \implies \beta = (\bX^T\bW\bX)^{-1}\bX^T\bW(\by - \bo)\]
 as one would expect.
 
@@ -371,7 +392,17 @@ maps the real line to the $[0, 1]$ interval.
 Finally, for Poisson regression, we take $b(x) = \exp(x)$, and so we recover
 \[g(x) = b'(x) = e^x\] which maps the real line to the positive half-line.
 
-#### Proximal Gradient Algorithm
+Consolidating these results, we see: 
+
+| Family   | Negative Log-Likelihood | Gradient |
+|---------:|:------------------------|:---------|
+| Gaussian | $\frac{(\by - \bX\beta - \bo)^T\bW(\by - \bX\beta - \bo)}{2n}$ | $\frac{-\bX^T\bW(\by - \bX\beta - \bo)}{n}$ |
+| Logistic | $\langle \text{diag}(\bW)/n, \log(1 + \text{exp}(\bX\beta + \bo)) - \by \odot (\bX\beta + \bo)\rangle$ | $-\bX^T\bW(\by - \textsf{inv-logit}(\bX\beta + \bo))/n$
+| Poisson  | $\langle \text{diag}(\bW)/n, \exp(\bX\beta + \bo) - \by \odot (\bX\beta + \bo)\rangle$ | $-\bX^T\bW(\by - \text{exp}(\bX\beta + \bo))/n$
+
+where $\odot$ is the elementwise (Hadamard) product of vectors.
+
+### Proximal Gradient Algorithm
 
 The proximal gradient algorithm that we use for GLMs is similar to that for the
 Gaussian case, but we introduce a back-tracking step instead of using a fixed
@@ -390,20 +421,22 @@ The final algorithm is then:
     - $k = 1$
 2. Repeat Until Convergence:
     - Set: $t = L$
-    - Calculate $\nabla \beta^{(k-1)} = -\bX^T(\bW/n)(g(\bX^T\beta^{(k-1)} + \bo) - \by)$
+    - Calculate $\nabla \beta^{(k-1)} = -\bX^T(\bW/n)(\by - g(\bX\beta^{(k-1)} + \bo))$
     - Repeat:
         - Let $\bz = \textsf{prox}_{t \lambda}(\beta^{(k-1)} - t \nabla \beta^{(k-1)})$
-        - If $\ell(z) \leq \ell(\beta^{(0)}) + \langle \nabla \beta^{(k-1)}, z - \beta^{(k-1)} \rangle + \frac{1}{2t} \|z - \beta^{(k-1)}\|_2^2$:
-            - \textsf{break}
+        - If $\ell(z) \leq \ell(\beta^{(k-1)}) + \langle \nabla \beta^{(k-1)}, z - \beta^{(k-1)} \rangle + \frac{1}{2t} \|z - \beta^{(k-1)}\|_2^2$:
+            - $\texttt{break}$
         - Else:
-            - Set $t = \alpha * t$^[The value of $\alpha$ here defaults to $0.8$ and
-            is controlled by the macro `EXLASSO_BACKTRACK_BETA`]
+            - Set $t = \alpha * t$ for fixed $\alpha$^[The value of $\alpha$ here
+            defaults to $0.8$ and is controlled by the pre-processor macro
+            `EXLASSO_BACKTRACK_BETA`.]
     - Set: $\beta^{(k)} = z$, $k: = k + 1$
 
-where $\ell$ is the smooth part (loss) of the objective function, and the proximal
-operator is evaluated using the coordinate-descent scheme described above.
+where $\ell$ is the smooth part of the objective function (*i.e.*, the negative 
+log-likelihood), and the proximal operator is evaluated using the coordinate-descent
+scheme described above.
 
-#### Coordinate Descent Algorithm
+### Coordinate Descent Algorithm
 
 In addition to the proximal gradient scheme, we can also employ a (variant of the)
 (inexact) proximal Newton method [@Lee:2014]. This method, sometimes also called a
@@ -554,10 +587,10 @@ element in a group, $z_i \neq 0$, then it must satisfy
 which generalizes the result above.  This is connected to the result that that
 the exclusive lasso reduces to ridge regression when all groups are of size one.
 
-### Exclusive Lasso
+### Gaussian Exclusive Lasso
 
 For the general problem, the KKT conditions are given by:
-\[0 \in -\bX^T(\by - \bX\beta) + \lambda \partial P(\beta)\]
+\[0 \in -\bX^T(\by - \bX\beta)/n + \lambda \partial P(\beta)\]
 
 Restricting attention to the (estimated) support $\hat{\beta}_{\hat{S}}$,
 Campbell and Allen [-@Campbell:2017, Proposition 1] show that $\hat{\beta}_{\hat{S}}$ has
@@ -582,6 +615,8 @@ To improve numerical stability, we add a small multiple of the identity matrix
 to the $\bX_{\hat{X}}^T\bX_{\hat{S}} + n * \lambda \bM_{\hat{S}}$ term before
 taking the (pseudo)-inverse.^[ After adding this term, this matrix is always
 strictly positive definite so the pseudo-inverse becomes the standard inverse.]
+
+**FIXME** Need to account for observation weights and intercept in DF calculation.
 
 ## Benchmarks
 

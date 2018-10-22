@@ -198,74 +198,81 @@ test_that("Standardization works", {
 
 })
 
-test_that("CD and PG get the same answer", {
-    set.seed(180)
 
-    n <- 200
-    p <- 50
-    groups <- rep(1:5, 10)
+test_that("Logistic returns ridge with trivial group structure", {
+    skip_if_not_installed("glmnet") ## For a logistic ridge implementation
+    library(glmnet)
+    set.seed(200)
 
-    beta <- rep(0, p)
-    beta[1:5] <- 3
-
-    X <- matrix(rnorm(n * p), ncol=p)
-    y <- plogis(X %*% beta)
-
-    fit1 <- exclusive_lasso(X, y, groups, family="binomial", algorithm="pg",
-                            nlambda=10, thresh=1e-10, thresh_prox=1e-10)
-    fit2 <- exclusive_lasso(X, y, groups, family="binomial", algorithm="cd",
-                            nlambda=10, thresh=1e-10, thresh_prox=1e-10)
-})
-
-test_that("GLM PG gets the same result as Gaussian PG", {
-    ## Compare to Gaussian case
-    set.seed(45)
+    ## Low-Dimensional
     n <- 200
     p <- 20
+    groups <- 1:p
 
-    groups <- rep(1:4, 5)
+    beta <- rep(1, p)
+    X <- matrix(rnorm(n * p), ncol=p); X[] <- scale(X)
+    y <- round(plogis(X %*% beta + rnorm(n)))
 
-    X <- matrix(rnorm(n * p), ncol=p)
-    beta <- rep(0, p); beta[1:4] <- 3
-    y <- X %*% beta + rnorm(n)
+    nlambda <- 10
 
-    options(ExclusiveLasso.gaussian_fast_path = TRUE)
+    elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
+                             family = "binomial",
+                             intercept=FALSE, standardize=FALSE,
+                             thresh=1e-14, thresh_prox=1e-14)
 
-    fit1 <- exclusive_lasso(X, y, groups, algorithm="pg",
-                            thresh=1e-10, thresh_prox=1e-10)
+    glfit <- glmnet(X, y, family = "binomial", intercept = FALSE,
+                    lambda = rev(elfit$lambda), standardize = FALSE,
+                    alpha = 0, thresh = 1e-20)
 
-    options(ExclusiveLasso.gaussian_fast_path = FALSE)
+    for(i in seq_len(nlambda)){
+        ## Glmnet returns coefficients 'reversed' compared to how we do it
+        expect_equal(coef(elfit)[, i], coef(glfit)[,nlambda - i + 1],
+                     check.attributes = FALSE)
+    }
 
-    fit2 <- exclusive_lasso(X, y, groups, algorithm="pg",
-                            thresh=1e-10, thresh_prox=1e-10)
+    ## High-Dimensional
+    n <- 200
+    p <- 500
+    groups <- 1:p
 
-    ## Reset this
-    options(Exclusive_lasso.gaussian_fast_path = TRUE)
+    beta <- numeric(p); beta[1:5] <- c(-3, 3, 1, -2, 1)
+
+    X <- matrix(rnorm(n * p), ncol=p); X[] <- scale(X)
+    y <- round(plogis(X %*% beta + rnorm(n)))
+
+    nlambda <- 10
+
+    elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
+                             family = "binomial",
+                             intercept=FALSE, standardize=FALSE,
+                             thresh=1e-14, thresh_prox=1e-14)
+
+    glfit <- glmnet(X, y, family = "binomial", intercept = FALSE,
+                    lambda = rev(elfit$lambda), standardize = FALSE,
+                    alpha = 0, thresh = 1e-20)
+
+    for(i in seq_len(nlambda)){
+        ## Glmnet returns coefficients 'reversed' compared to how we do it
+        expect_equal(coef(elfit)[, i], coef(glfit)[,nlambda - i + 1], check.attributes = FALSE)
+    }
 })
 
-
-test_that("GLM CD gets the same result as Gaussian CD", {
-    ## Compare to Gaussian case
-    set.seed(545)
-    n <- 100
+test_that("CD and PG solvers get the same result for Logistic GLMs", {
+    set.seed(55)
+    n <- 400
     p <- 40
 
     groups <- rep(1:4, length.out=p)
 
-    X <- matrix(rnorm(n * p), ncol=p)
-    beta <- rep(0, p); beta[1:4] <- 3
-    y <- X %*% beta + rnorm(n)
+    X <- matrix(rnorm(n * p), ncol=p); X[] <- scale(X)
+    beta <- rep(0, p); beta[1:4] <- 5
+    y <- plogis(X %*% beta)
 
-    options(ExclusiveLasso.gaussian_fast_path = TRUE)
+    fit1 <- exclusive_lasso(X, y, groups, algorithm="cd", family="binomial",
+                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE)
+    fit2 <- exclusive_lasso(X, y, groups, algorithm="pg", family="binomial",
+                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE)
 
-    fit1 <- exclusive_lasso(X, y, groups, algorithm="cd",
-                            thresh=1e-10, thresh_prox=1e-10)
-
-    options(ExclusiveLasso.gaussian_fast_path = FALSE)
-
-    fit2 <- exclusive_lasso(X, y, groups, algorithm="cd",
-                            thresh=1e-10, thresh_prox=1e-10)
-
-    ## Reset this
-    options(Exclusive_lasso.gaussian_fast_path = TRUE)
+    ## Be a bit looser here than strictly necessary since we are using inexact PG
+    expect_equal(coef(fit1), coef(fit2), tolerance = 1e-6)
 })

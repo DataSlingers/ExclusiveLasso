@@ -266,7 +266,7 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
         //         linear_predictor redundantly?
         f = [&](const arma::vec& beta){
             arma::vec linear_predictor = X1 * beta + o;
-            return arma::dot(w/n, y % linear_predictor - arma::exp(linear_predictor));
+            return arma::dot(w/n, arma::exp(linear_predictor) - y % linear_predictor);
         };
 
         g = [&](const arma::vec& beta){
@@ -303,9 +303,8 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
         double t = L;
         do {
             beta_old = beta;
-            double f_old = f(beta);
-
-            arma::vec grad_beta_old = g(beta);
+            const double f_old = f(beta);
+            const arma::vec grad_old = g(beta);
 
             bool descent_achieved = false;
 
@@ -313,10 +312,10 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
                 // This is the back-tracking search of Parikh and Boyd
                 // Proximal Algorithms, Section 4.2, who cite Beck and Teboulle
                 // except we reset t to L at each iteration (lambda)
-                arma::vec z = prox(beta - t * grad_beta_old, lambda(i) * t);
-                double f_z = f(z);
+                const arma::vec z = prox(beta - t * grad_old, lambda(i) * t);
+                const double f_z = f(z);
 
-                if(f_z <= f_old + arma::dot(grad_beta_old, z - beta) + 1 / (2.0 * t) * norm_sq(z-beta)){
+                if(f_z <= f_old + arma::dot(grad_old, z - beta) + 1 / (2.0 * t) * norm_sq(z-beta)){
                     descent_achieved = true;
                     beta = z;
                 } else {

@@ -126,7 +126,7 @@ test_that("Dynamic defaults work", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              family="binomial",
-                             thresh_prox=1e-2, thresh=1e-2)
+                             thresh_prox=1e-2, thresh=1e-2, skip_df = TRUE)
 
     expect_true(all(elfit$weights == 1))
     expect_true(all(elfit$offset == 0))
@@ -153,7 +153,7 @@ test_that("Preserves column names", {
     elfit <- exclusive_lasso(X, y, groups,
                              family="binomial",
                              thresh_prox=1e-2,
-                             thresh=1e-2)
+                             thresh=1e-2, skip_df = TRUE)
 
     expect_equal(rownames(elfit$coef),
                  colnames(X))
@@ -180,14 +180,14 @@ test_that("Standardization works", {
     elfit <- exclusive_lasso(X, y, groups,
                              family="binomial",
                              thresh_prox=1e-8,
-                             thresh=1e-8)
+                             thresh=1e-8, skip_df = TRUE)
 
     elfit_sc <- exclusive_lasso(X_sc, y, groups,
                                 lambda=elfit$lambda,
                                 family="binomial",
                                 standardize=FALSE,
                                 thresh_prox=1e-8,
-                                thresh=1e-8)
+                                thresh=1e-8, skip_df = TRUE)
 
     expect_equal(elfit$intercept, elfit_sc$intercept)
     expect_equal(scale(elfit$X), elfit_sc$X, check.attributes=FALSE)
@@ -218,7 +218,7 @@ test_that("Logistic returns ridge with trivial group structure", {
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              family = "binomial",
                              intercept=FALSE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     glfit <- glmnet(X, y, family = "binomial", intercept = FALSE,
                     lambda = rev(elfit$lambda), standardize = FALSE,
@@ -234,7 +234,7 @@ test_that("Logistic returns ridge with trivial group structure", {
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              family = "binomial",
                              intercept=TRUE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     glfit <- glmnet(X, y, family = "binomial", intercept = TRUE,
                     lambda = rev(elfit$lambda), standardize = FALSE,
@@ -261,7 +261,7 @@ test_that("Logistic returns ridge with trivial group structure", {
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              family = "binomial",
                              intercept=FALSE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     glfit <- glmnet(X, y, family = "binomial", intercept = FALSE,
                     lambda = rev(elfit$lambda), standardize = FALSE,
@@ -285,9 +285,9 @@ test_that("CD and PG solvers get the same result for Logistic GLMs", {
     y <- plogis(X %*% beta)
 
     fit1 <- exclusive_lasso(X, y, groups, algorithm="cd", family="binomial",
-                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE)
+                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE, skip_df = TRUE)
     fit2 <- exclusive_lasso(X, y, groups, algorithm="pg", family="binomial",
-                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE)
+                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE, skip_df = TRUE)
 
     ## Be a bit looser here than strictly necessary since we are using inexact PG
     expect_equal(coef(fit1), coef(fit2), tolerance = 1e-6)

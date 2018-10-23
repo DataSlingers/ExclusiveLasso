@@ -115,7 +115,7 @@ test_that("Dynamic defaults work", {
     groups <- rep(1:g, length.out=p)
 
     elfit <- exclusive_lasso(X, y, groups,
-                             thresh_prox=1e-2, thresh=1e-2)
+                             thresh_prox=1e-2, thresh=1e-2, skip_df = TRUE)
 
     expect_true(all(elfit$weights == 1))
     expect_true(all(elfit$offset == 0))
@@ -141,7 +141,7 @@ test_that("Preserves column names", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              thresh_prox=1e-2,
-                             thresh=1e-2)
+                             thresh=1e-2, skip_df = TRUE)
 
     expect_equal(rownames(elfit$coef),
                  colnames(X))
@@ -167,12 +167,12 @@ test_that("Standardization works", {
 
     elfit <- exclusive_lasso(X, y, groups,
                              thresh_prox=1e-8,
-                             thresh=1e-8)
+                             thresh=1e-8, skip_df = TRUE)
 
     elfit_sc <- exclusive_lasso(X_sc, y, groups, lambda=elfit$lambda,
                                 standardize=FALSE,
                                 thresh_prox=1e-8,
-                                thresh=1e-8)
+                                thresh=1e-8, skip_df = TRUE)
 
     expect_equal(elfit$intercept, elfit_sc$intercept)
     expect_equal(scale(elfit$X), elfit_sc$X, check.attributes=FALSE)
@@ -206,7 +206,7 @@ test_that("Returns prox for orthogonal case", {
     lambda <- 0.75
 
     elfit <- exclusive_lasso(X, y, groups, lambda=lambda,
-                             standardize=FALSE, intercept=FALSE)
+                             standardize=FALSE, intercept=FALSE, skip_df = TRUE)
     prox_coefs <- ExclusiveLasso:::exclusive_lasso_prox(crossprod(X, y),
                                                         groups, lambda * n)
 
@@ -230,7 +230,7 @@ test_that("Returns ridge with trivial group structure", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     for(i in seq_len(nlambda)){
         expect_equal(solve(crossprod(X)/n + elfit$lambda[i] * diag(1, p, p),
@@ -254,7 +254,7 @@ test_that("Returns ridge with trivial group structure", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     for(i in seq_len(nlambda)){
         expect_equal(solve(crossprod(X)/n + elfit$lambda[i] * diag(1, p, p),
@@ -311,7 +311,7 @@ test_that("Matches closed form solution", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     for(i in seq_len(nlambda)){
         beta_hat <- elfit$coef[, i]
@@ -342,7 +342,7 @@ test_that("Matches closed form solution", {
 
     elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
                              intercept=FALSE, standardize=FALSE,
-                             thresh=1e-14, thresh_prox=1e-14)
+                             thresh=1e-14, thresh_prox=1e-14, skip_df = TRUE)
 
     for(i in seq_len(nlambda)){
         beta_hat <- elfit$coef[, i]
@@ -372,8 +372,10 @@ test_that("Gaussian CD + PG algorithms give the same result",{
 
     y <- X %*% beta + rnorm(n)
 
-    f1 <- exclusive_lasso(X, y, groups, algorithm="cd", thresh=1e-12)
-    f2 <- exclusive_lasso(X, y, groups, algorithm="pg", thresh=1e-12, thresh_prox=1e-12)
+    f1 <- exclusive_lasso(X, y, groups, algorithm="cd",
+                          thresh=1e-12, skip_df = TRUE)
+    f2 <- exclusive_lasso(X, y, groups, algorithm="pg",
+                          thresh=1e-12, thresh_prox=1e-12, skip_df = TRUE)
 
     expect_equal(coef(f1), coef(f2))
 
@@ -382,9 +384,9 @@ test_that("Gaussian CD + PG algorithms give the same result",{
     y <- X %*% beta + rnorm(n)
 
     f1 <- exclusive_lasso(X, y, groups, weights=w,
-                          algorithm="cd", thresh=1e-12)
+                          algorithm="cd", thresh=1e-12, skip_df = TRUE)
     f2 <- exclusive_lasso(X, y, groups, weights=w,
-                          algorithm="pg", thresh=1e-12, thresh_prox=1e-12)
+                          algorithm="pg", thresh=1e-12, thresh_prox=1e-12, skip_df = TRUE)
 
     expect_equal(coef(f1), coef(f2))
 
@@ -393,9 +395,9 @@ test_that("Gaussian CD + PG algorithms give the same result",{
     y <- X %*% beta + o + rnorm(n)
 
     f1 <- exclusive_lasso(X, y, groups, offset=o,
-                          algorithm="cd", thresh=1e-12)
+                          algorithm="cd", thresh=1e-12, skip_df = TRUE)
     f2 <- exclusive_lasso(X, y, groups, offset=o,
-                          algorithm="pg", thresh=1e-12, thresh_prox=1e-12)
+                          algorithm="pg", thresh=1e-12, thresh_prox=1e-12, skip_df = TRUE)
 
     expect_equal(coef(f1), coef(f2))
 
@@ -404,9 +406,9 @@ test_that("Gaussian CD + PG algorithms give the same result",{
     ## We need to use very high precision to get the values to match,
     ## so check fewer lambdas to get this done in a reasonable amount of time
     f <- exclusive_lasso(X, y, groups, offset=o, weights=w, nlambda=10,
-                         algorithm="cd", thresh=1e-14)
+                         algorithm="cd", thresh=1e-14, skip_df = TRUE)
     f2 <- exclusive_lasso(X, y, groups, offset=o, weights=w, nlambda=10,
-                         thresh=1e-14, thresh_prox=1e-14, algorithm="pg")
+                         thresh=1e-14, thresh_prox=1e-14, algorithm="pg", skip_df = TRUE)
     expect_equal(coef(f), coef(f2))
 })
 
@@ -425,42 +427,42 @@ test_that("Intercepts work", {
     y <- X %*% beta + rnorm(n)
     ym <- matrix(y, nrow=length(y), ncol=100, byrow=FALSE)
 
-    f <- exclusive_lasso(X, y, groups, standardize=TRUE, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=TRUE, thresh=1e-12, skip_df = TRUE)
     expect_equal(colMeans(ym - X %*% coef(f)[-1, ]), coef(f)[1,])
     expect_equal(colMeans(predict(f)), rep(mean(y), 100))
 
-    f <- exclusive_lasso(X, y, groups, standardize=FALSE, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=FALSE, thresh=1e-12, skip_df = TRUE)
     expect_equal(colMeans(ym - X %*% coef(f)[-1, ]), coef(f)[1,])
     expect_equal(colMeans(predict(f)), rep(mean(y), 100))
 
     ## + Weights
     w <- runif(n, 0.5, 1.5); w <- w * n / sum(w);
 
-    f <- exclusive_lasso(X, y, groups, standardize=TRUE, weights=w, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=TRUE, weights=w, thresh=1e-12, skip_df = TRUE)
     expect_equal(apply(ym - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 100))
 
-    f <- exclusive_lasso(X, y, groups, standardize=FALSE, weights=w, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=FALSE, weights=w, thresh=1e-12, skip_df = TRUE)
     expect_equal(apply(ym - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 100))
 
     ## + Offsets
     o <- runif(n, 1.5, 2.5);
 
-    f <- exclusive_lasso(X, y, groups, standardize=TRUE, offset=o, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=TRUE, offset=o, thresh=1e-12, skip_df = TRUE)
     expect_equal(colMeans(ym - o - X %*% coef(f)[-1, ]), coef(f)[1,])
     expect_equal(colMeans(predict(f)), rep(mean(y), 100))
 
-    f <- exclusive_lasso(X, y, groups, standardize=FALSE, offset=o, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=FALSE, offset=o, thresh=1e-12, skip_df = TRUE)
     expect_equal(colMeans(ym - o - X %*% coef(f)[-1, ]), coef(f)[1,])
     expect_equal(colMeans(predict(f)), rep(mean(y), 100))
 
     ## + Weights + Offsets
-    f <- exclusive_lasso(X, y, groups, standardize=TRUE, offset=o, weights=w, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=TRUE, offset=o, weights=w, thresh=1e-12, skip_df = TRUE)
     expect_equal(apply(ym - o - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 100))
 
-    f <- exclusive_lasso(X, y, groups, standardize=FALSE, offset=o, weights=w, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=FALSE, offset=o, weights=w, thresh=1e-12, skip_df = TRUE)
     expect_equal(apply(ym - o - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 100))
 
@@ -470,13 +472,13 @@ test_that("Intercepts work", {
     y <- X %*% beta + rnorm(n) + 1
     ym <- matrix(y, nrow=length(y), ncol=100, byrow=FALSE)
 
-    f <- exclusive_lasso(X, y, groups, standardize=TRUE, offset=o, weights=w, thresh=1e-12)
+    f <- exclusive_lasso(X, y, groups, standardize=TRUE, offset=o, weights=w, thresh=1e-12, skip_df = TRUE)
     expect_equal(apply(ym - o - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 100))
 
     ## This one has convergence problems, so only check 10 lambdas
     ym <- matrix(y, nrow=length(y), ncol=10, byrow=FALSE)
-    f <- exclusive_lasso(X, y, groups, standardize=FALSE, nlambda=10, offset=o, weights=w, thresh=1e-8)
+    f <- exclusive_lasso(X, y, groups, standardize=FALSE, nlambda=10, offset=o, weights=w, thresh=1e-8, skip_df = TRUE)
     expect_equal(apply(ym - o - X %*% coef(f)[-1, ], 2, weighted.mean, w), coef(f)[1,])
     expect_equal(apply(predict(f), 2, weighted.mean, w), rep(weighted.mean(y, w), 10))
 })
@@ -494,13 +496,13 @@ test_that("Estimation works in low-dim + low-penalty case", {
 
     y <- X %*% beta + 3 ## No noise
 
-    f <- exclusive_lasso(X, y, groups, thresh=1e-12, lambda=1e-14)
+    f <- exclusive_lasso(X, y, groups, thresh=1e-12, lambda=1e-14, skip_df = TRUE)
     expect_equal(coef(f)[1,,drop=TRUE], 3, check.attributes=FALSE)
     expect_equal(coef(f)[-1,,drop=TRUE], beta, check.attributes=FALSE)
 
     ## + Weights
     w <- runif(n, 2, 3); w <- w / sum(w) * n
-    f <- exclusive_lasso(X, y, groups, weights=w, thresh=1e-12, lambda=1e-14)
+    f <- exclusive_lasso(X, y, groups, weights=w, thresh=1e-12, lambda=1e-14, skip_df = TRUE)
     expect_equal(coef(f)[1,,drop=TRUE], 3, check.attributes=FALSE)
     expect_equal(coef(f)[-1,,drop=TRUE], beta, check.attributes=FALSE)
 })

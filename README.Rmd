@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-[![Travis-CI Build Status](https://api.travis-ci.com/DataSlingers/ExclusiveLasso.svg?branch=master)](https://travis-ci.com/DataSlingers/ExclusiveLasso) [![codecov](https://codecov.io/gh/DataSlingers/ExclusiveLasso/branch/master/graph/badge.svg)](https://codecov.io/gh/DataSlingers/ExclusiveLasso) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/ExclusiveLasso)](https://cran.r-project.org/package=ExclusiveLasso) [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![Travis-CI Build Status](https://api.travis-ci.com/DataSlingers/ExclusiveLasso.svg?branch=develop)](https://travis-ci.com/DataSlingers/ExclusiveLasso) [![codecov](https://codecov.io/gh/DataSlingers/ExclusiveLasso/branch/develop/graph/badge.svg)](https://codecov.io/gh/DataSlingers/ExclusiveLasso) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/ExclusiveLasso)](https://cran.r-project.org/package=ExclusiveLasso) [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
 ## The Exclusive Lasso
 
@@ -43,7 +43,7 @@ The current working version of the package can be installed from Github:
 
 ```{r, eval=FALSE}
 library(devtools)
-install_github("DataSlingers/ExclusiveLasso", ref="build")
+install_github("DataSlingers/ExclusiveLasso")
 ```
 
 ## Usage

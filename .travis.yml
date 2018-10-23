@@ -31,14 +31,14 @@ after_success:
 
 branches:
   except:
-    - build # Don't build "build" branch or else we get in an infinite loop
+    - master # Don't build "master" branch or else we get in an infinite loop
 
 deploy:
   provider: pages
   skip_cleanup: true
   github_token: $GITHUB_TOKEN
   on:
-    branch: master
+    branch: develop
   local_dir: .
-  target_branch: build
+  target_branch: master
   condition: $TRAVIS_OS_NAME = "linux"

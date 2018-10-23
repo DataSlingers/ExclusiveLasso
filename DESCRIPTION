@@ -2,7 +2,7 @@ Package: ExclusiveLasso
 Type: Package
 Title: Generalized Linear Models with the Exclusive Lasso Penalty
 Version: 0.0
-Date: 2017-10-04
+Date: 2018-10-23
 Authors@R: c(
     person("Michael", "Weylandt", role=c("aut", "cre"), email="michael.weylandt@rice.edu"),
     person("Frederick", "Campbell", role="aut", email="fc10@rice.edu"),
@@ -14,9 +14,8 @@ Description: Fit Generalized Linear Models ("GLMs") using the "Exclusive Lasso"
 License: GPL (>= 2)
 Imports: Rcpp (>= 0.12.12), Matrix, RColorBrewer, foreach
 LinkingTo: Rcpp, RcppArmadillo (>= 0.8.300.1.0)
-Suggests: testthat, knitr, microbenchmark, glmnet, ncvreg, grpreg
+Suggests: testthat, knitr, microbenchmark, glmnet, ncvreg, grpreg, covr
 VignetteBuilder: knitr
-RoxygenNote: 6.0.1
 GitHash: $GITHASH$
-BugReports: https://github.com/michaelweylandt/ExclusiveLasso/issues
-URL: https://github.com/michaelweylandt/ExclusiveLasso
+BugReports: https://github.com/DataSlingers/ExclusiveLasso/issues
+URL: https://github.com/DataSlingers/ExclusiveLasso

@@ -4,9 +4,6 @@ cache: packages
 
 os: 
   - linux
-  - osx
-
-osx_image: xcode9
 
 r_packages:
   - Rcpp
@@ -16,13 +13,17 @@ r_build_args: --no-manual --no-resave-data
 r_check_args: --no-manual
 
 before_install:
-  - Rscript -e "install.packages(c('devtools', 'roxygen2', 'testthat', 'rmarkdown'))"
+  - gcc --version
+  - g++ --version
+  - Rscript -e "install.packages(c('devtools', 'roxygen2', 'testthat', 'rmarkdown', 'pkgdown'))"
   - Rscript -e "devtools::install_deps(quiet=FALSE, dependencies=TRUE)"
   - Rscript -e "roxygen2::roxygenize(); Rcpp::compileAttributes(verbose=TRUE)"
   - Rscript -e "devtools::document()"
 
 after_success:
   - Rscript -e "devtools::install(); rmarkdown::render('README.Rmd')"
+  - Rscript -e 'if(Sys.info()["sysname"] != "Linux"){q()}; library(covr); flags <- getOption("covr.flags"); flags[] <- gsub("-O0 ", "", flags); options(covr.flags=flags); codecov(quiet=FALSE)'
+  - Rscript -e "pkgdown::build_site()"
   - rm -rf ExclusiveLasso.Rcheck
   - rm -rf ExclusiveLasso_*.tar.gz
   - mv .gitignore.deploy .gitignore # so we add things we'd normally ignore

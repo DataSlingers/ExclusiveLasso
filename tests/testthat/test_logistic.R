@@ -230,6 +230,22 @@ test_that("Logistic returns ridge with trivial group structure", {
                      check.attributes = FALSE)
     }
 
+    ## Now with intercepts
+    elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
+                             family = "binomial",
+                             intercept=TRUE, standardize=FALSE,
+                             thresh=1e-14, thresh_prox=1e-14)
+
+    glfit <- glmnet(X, y, family = "binomial", intercept = TRUE,
+                    lambda = rev(elfit$lambda), standardize = FALSE,
+                    alpha = 0, thresh = 1e-20)
+
+    for(i in seq_len(nlambda)){
+        ## Glmnet returns coefficients 'reversed' compared to how we do it
+        expect_equal(coef(elfit)[, i], coef(glfit)[,nlambda - i + 1],
+                     check.attributes = FALSE)
+    }
+
     ## High-Dimensional
     n <- 200
     p <- 500

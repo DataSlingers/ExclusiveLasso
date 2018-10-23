@@ -35,6 +35,7 @@ knitr::opts_chunk$set(cache=TRUE)
 \newcommand{\bX}{\mathbf{X}}
 \newcommand{\by}{\mathbf{y}}
 \newcommand{\bz}{\mathbf{z}}
+\newcommand{\bw}{\mathbf{w}}
 \newcommand{\bW}{\mathbf{W}}
 \newcommand{\bg}{\mathbf{g}}
 \newcommand{\bV}{\mathbf{V}}
@@ -123,9 +124,17 @@ to a number of parallelization schemes.
 We use the "$1/n$"-scaling for penalized regression, as well as including a
 factor of $1/2$ in the penalty term:
 
-\[\hat{\beta}_{\text{EL}} = \argmin -\frac{1}{n}\sum_{i=1}^n \ell(y_i; \bx_i^T\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2} \tag{EL-GLM} \label{eq:el-glm}\]
+\[\hat{\beta}_{\text{EL}} = \argmin -\frac{1}{n}\sum_{i=1}^n l(y_i; \bx_i^T\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2} \tag{EL-GLM} \label{eq:el-glm}\]
 
-where $\ell(y_i; \bx_i^T\beta)$ is the log-likelihood of the observation $(\bx_i, y_i)$.
+where $l(y_i; \bx_i^T\beta)$ is the log-likelihood of the observation $(\bx_i, y_i)$.
+For convenience, we will use the script $\ell$ to denote the scaled aggregate *negative*
+log-likelihood yielding the problem:^[Below, when observation weights are included,
+they will be included in the definition of $\ell$, but not of the $l_i$ terms.]
+
+\[\hat{\beta}_{\text{EL}} = \argmin \ell(\by; \bX\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}\]
+
+^[Below, when observation weights are included, they will be included in the definition of $\ell$, but
+not of the $l_i$ terms.]
 
 In the Gaussian case, this can be simplified to
 \[\hat{\beta}_{\text{EL}} = \argmin \frac{1}{2n}\|\by - \bX\beta\|_2^2 + \underbrace{\lambda \sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}}_{\lambda * P(\beta)} \tag{EL-Gaussian} \label{eq:el-gaussian}\]
@@ -224,7 +233,7 @@ for $\eqref{eq:el-gaussian}$.
     - $\beta^{(0)} = 0$
     - $t = \lambda_{\text{max}}(\bX^T\bX/n)^{-1}$
     - $k = 1$
-2. Repeat Until Convergence:
+2. Repeat until convergence:
     - $\bz^{(k-1)} = (\bI + t \bX^T\bX/n)\beta^{(k-1)} - t \bX^T\by/n$
     - For each group $g \in \mathcal{G}$:
         - Initialize $x_g = 0$
@@ -240,7 +249,7 @@ weight matrix $\bW$ and an intercept term $\alpha$, the combined algorithm becom
     - $\beta^{(0)} = 0$
     - $t = \lambda_{\text{max}}(\bX^T\bW\bX/n)^{-1}$
     - $k = 1$
-2. Repeat Until Convergence:
+2. Repeat until convergence:
     - $\bz^{(k-1)} = (\bI + t \bX^T\bW\bX/n)\beta^{(k-1)} - t \bX^T\bW(\by-\bo)/n$
     - For each group $g \in \mathcal{G}$:
         - Initialize $x_g = 0$
@@ -301,11 +310,10 @@ Hence the coordinate descent algorithm is given by:
 
 1. Initialize
     - $\beta = 0$
-    - $k = 1$
     - $\br = \by - \bX\beta = \by$
 2. Precompute:
     - $\bu$ where $u_i = \bx_i^T\bx_i$
-3. Repeat Until Convergence:
+3. Repeat until convergence:
     - For $i \in [p]$:
         - Update working residual: $\br := \br + \bX_i\beta_i$
         - Set $z = \br^T\bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g,-i}\|_1$
@@ -323,17 +331,18 @@ algorithm becomes:
 
 1. Initialize
     - $\beta = 0$
-    - $k = 1$
     - $\br = \by - \bo - \bX\beta = \by - \bo$
 2. Precompute:
     - $\bu = \text{diag}(\bX^T\bW\bX)$
-3. Repeat Until Convergence:
+3. Repeat until convergence:
     - For $i \in [p]$:
         - Update working residual: $\br := \br + \bX_i\beta_i$
         - Set $z = \br^T\bW\bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g,-i}\|_1$
         - Update:
             \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(z)\]
-        - Update working residual: $\br := \br - \bX_i\beta_i + \alpha 1_{n}$
+        - Update working residual: $\br := \br - \bX_i\beta_i$
+    - Update intercept:
+        - Update working residual: $\br: \br + \alpha 1_n$
         - Update intercept: $\alpha := \langle \br, \text{diag}(\bW)/n \rangle$
         - Update working residual: $\br := \br - \alpha 1_{n}$
 
@@ -394,8 +403,8 @@ Finally, for Poisson regression, we take $b(x) = \exp(x)$, and so we recover
 
 Consolidating these results, we see: 
 
-| Family   | Negative Log-Likelihood | Gradient |
-|---------:|:------------------------|:---------|
+| Family   | Negative Log-Likelihood, $\ell$ | Gradient, $\nabla_{\beta} \ell$ |
+|---------:|:--------------------------------|:--------------------------------|
 | Gaussian | $\frac{(\by - \bX\beta - \bo)^T\bW(\by - \bX\beta - \bo)}{2n}$ | $\frac{-\bX^T\bW(\by - \bX\beta - \bo)}{n}$ |
 | Logistic | $\langle \text{diag}(\bW)/n, \log(1 + \text{exp}(\bX\beta + \bo)) - \by \odot (\bX\beta + \bo)\rangle$ | $-\bX^T\bW(\by - \textsf{inv-logit}(\bX\beta + \bo))/n$
 | Poisson  | $\langle \text{diag}(\bW)/n, \exp(\bX\beta + \bo) - \by \odot (\bX\beta + \bo)\rangle$ | $-\bX^T\bW(\by - \text{exp}(\bX\beta + \bo))/n$
@@ -418,8 +427,7 @@ The final algorithm is then:
 1. Initialize
     - $\beta^{(0)} = 0$
     - $L = \lambda_{\text{max}}(\bX^T\bW\bX/n)^{-1}$
-    - $k = 1$
-2. Repeat Until Convergence:
+2. Repeat until convergence:
     - Set: $t = L$
     - Calculate $\nabla \beta^{(k-1)} = -\bX^T(\bW/n)(\by - g(\bX\beta^{(k-1)} + \bo))$
     - Repeat:
@@ -455,84 +463,104 @@ to use the efficient algorithm we have already developed for the linear case,
 namely coordinate descent. Like `glmnet`, we do not use a back-tracking rule
 to guarantee descent.
 
-Solving the exact quadratic approximation is computationally expensive, so we 
-instead use an approximate Hessian, obtained by taking the diagonal of the true
-Hessian. This scheme has been used in `glmnet` for fitting the penalized Cox
-model [@Simon:2011, Section 2.1] effectively, but lacks formal justification.
+As with proximal gradient, the implementation of this algorithm is made much
+easier by taking advantage of the structure of GLMs. In particular, we note that
+the Hessian (second derivative) again has a simple form. Under the same assumptions
+as before, we have:
 
-To implement this strategy, we need to calculate the gradient and the diagonal of
-the Hessian of the negative log-likelihood with respect *to the linear predictor*
-(not with respect to the regression coefficients): this calculation turns out
-to be slightly simpler than the calculations above. Under the same assumptions
-as before, we have: 
+\[\frac{\partial l_i}{\partial \beta_j} = b'(\bx_i^T\beta + \bo_i)x_{ij} - y_ix_{ij}\]
 
-\[l_i(\eta_i) = b(\eta_i) - y_i * \eta_i\]
+Taking a second derivative with respect to $\beta_k$, we get: 
 
-so 
+\[\frac{\partial^2 l_i}{\partial \beta_j \partial \beta_k} = b''(\bx_i^T\beta + \bo_i)x_{ij}x_{ik}\]
 
-\[\frac{\partial l_i}{\partial \eta_i} = b'(\eta_i) - y_i\]
+This lets us write the general GLM hessian in a particularly simple form: 
 
-and 
+\[\mathcal{H}_{\beta} l_i = \bX^T \text{diag} \widetilde{\bW}_i \bX\]
 
-\[\frac{\partial^2 l_i}{\partial \eta_i^2} = b''(\eta_i)\]
+where $\widetilde{\bW}_i$ is a matrix with $b''(\bx_i^T\beta + \bo_i)$ in the $(i, i)$-th
+element and zero otherwise. Hence,
 
-For the GLM families we considered above, we have: 
+\[\mathcal{H}_{\beta} \ell = \sum_{i=1}^n \frac{w_i}{n}\mathcal{H}_{\beta}l_i = \bX^T\left[\bW\widetilde{\bW}/n\right]_i\bX\]
 
-- Gaussian: $b(x) = \frac{1}{2}x^2$ so $b'(x) = x$ and $b''(x) = 1$, giving 
-  \[\frac{\partial l_i}{\partial \eta_i} = \eta_i - y_i = \bx_i^T\beta + \alpha + o_i - y_i\] and 
-  \[\frac{\partial^2 l_i}{\partial \eta_i^2} = 1\] 
-  as we would expect
-- Logistic: $b(x) = \log(1+e^x)$ gives $b'(x) = (1 + e^{-x})^{-1}$ and 
-  $b''(x) = b'(x)(1 - b'(x))$ so
-  \[\frac{\partial l_i}{\partial \eta_i} = \frac{1}{1+e^{-\eta_i}} - y_i\] and 
-  \[\frac{\partial^2 l_i}{\partial \eta_i^2} = \left(1 - \frac{1}{1+e^{-\eta_i}}\right)\left(\frac{1}{1+e^{-\eta_i}}\right)\] 
-- Poisson: $b(x) = \exp(x)$ gives $b'(x) = b''(x) = \exp(x)$ so 
-  \[\frac{\partial l_i}{\partial \eta_i} = e^{\eta_i} - y_i\] and 
-  \[\frac{\partial^2 l_i}{\partial \eta_i^2} = e^{\eta_i}\] 
-  
-Note that these working residuals and weight adjustments are used for the IRLS-type
-scheme used to fit the GLM, so we do not include the observation weights and $n^{-1}$
-factor in their calculation. Observation weights and $n^{-1}$ are included in the
-coordinate descent inner loop directly in the same fashion that they are for
-Gaussian models.
-    
-We plug these results into the inexact successive quadratic approximation
-algorithm to obtain: 
+where $\widetilde{\bW} = \sum_{i = 1}^n \widetilde{\bW}_i$, $\bW$ is the diagonal
+matrix of observation weights.
+
+For our sequential quadratic approximation / proximal Newton updates, we
+replace the smooth portion of the problem with a quadratic approximation, giving: 
+
+\[\argmin_{\beta} \ell(\by, \bX\beta) + \lambda P(\beta) \approx \argmin_{\beta} \ell(\beta_0) + \langle\nabla_{\beta = \beta_0}\ell, \beta - \beta_0\rangle + \frac{(\beta - \beta_0)^T (\mathcal{H}_{\beta = \beta_0}\ell)(\beta - \beta_0)}{2} + \lambda P(\beta)\]
+
+which can be slightly simplified to: 
+
+\[\argmin_{\beta} \ell(\beta_0) + \langle\nabla_{\beta = \beta_0}\ell - \mathcal{H}_{\beta = \beta_0}\beta_0, \beta \rangle + \frac{\beta^T (\mathcal{H}_{\beta = \beta_0}\ell)\beta}{2} + \lambda P(\beta)\]
+
+Using our above expressions for $\nabla \ell$ and $\mathcal{H} \ell$, this becomes
+
+\[\begin{align*}
+\argmin_{\beta} \ell(\beta_0) + \langle\nabla_{\beta = \beta_0}\ell - \mathcal{H}_{\beta = \beta_0}\beta_0, \beta \rangle + \frac{\beta^T (\mathcal{H}_{\beta = \beta_0}\ell)\beta}{2} + \lambda P(\beta) \\
+\argmin_{\beta} \ell(\beta_0) + \langle -\bX^T\bW(y - g(\bX\beta_0 + \bo))/n - \bX^T\bW\widetilde{\bW}/n\bX\beta_0, \beta\rangle + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta)\\
+\argmin_{\beta} \ell(\beta_0) -\frac{(y - g(\bX\beta_0 + \bo) - \widetilde{\bW}\bX\beta_0)^T\bW\bX\beta}{n} + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta) \\
+\argmin_{\beta} \ell(\beta_0) -\frac{\left(\widetilde{\bW}^{-1}(y - g(\bX\beta_0 + \bo) - \bX\beta_0\right)^T\bW\widetilde{\bW}\bX\beta}{n} + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta) \\
+\end{align*}\]
+
+We note that this quadratic approximation is of the same form as a weighted Gaussian likelihood
+
+\[\argmin_{\beta} \frac{(\by - \bX\beta - \bo)^T\bW(\by - \bX\beta - \bo)}{2n} + \lambda P(\beta) = \argmin_{\beta}\frac{\by^T\bW\by}{2n} - \frac{\by^T\bW\bX\beta}{2n} + \frac{\beta^T\bX^T\bW\bX^T\beta}{n} + \lambda P(\beta)\]
+
+Aligning terms, we write our quadratic approximation as a weighted Gaussian problem
+
+\[\argmin_{\beta} \ell(\beta_0) -\frac{\left(\widetilde{\bW}^{-1}(y - g(\bX\beta_0 + \bo) - \bX\beta_0\right)^T\bW\widetilde{\bW}\bX\beta}{n} + \frac{\beta\bX^T(\bW\widetilde{\bW})\bX\beta}{2n} + \lambda P(\beta) = \argmin_{\beta} \frac{(\bz - \bX\beta - \bo)(\bW\widetilde{\bW}) (\bz - \bX\beta - \bo)}{2n} + \lambda P(\beta)\]
+
+where $\bz = \widetilde{\bW}^{-1}(\by - g(\bX\beta_0 + \bo)) + \bX\beta_0$. We note
+that this scheme is very similar to the IRLS (iteratively reweighted least squares)
+algorithm used to fit unpenalized GLMs, though IRLS implementations sometimes use
+the expected value of $\widetilde{\bW}$ at $\beta_0$ rather than the observed value, 
+which gives them a sort of regularized quasi-Newton flavor.
+
+**FIXME** The above drops an offset term somewhere...
+
+Since this problem has been put in Gaussian form, we can re-use the coordinate descent
+scheme derived above, yielding our proximal Newton algorithm: 
 
 1. Initialize
-    - $\beta^{(0)} = 0$
-    - $\alpha^{(0)} = 0$
-    - $\eta^{(0)} = X\beta^{(0)} + \alpha^{(0)} + \bo = \bo$
-    - $z(\eta^{(0)})_j =\bo - \frac{\partial l_j / \partial \eta_j}{\partial^2 l_j / \partial \eta_j^2}$
-    - $\omega_j^{(0)} = \frac{\partial^2 l_j}{\partial \eta_j^2} * w_j$
-    - $\br = z(\eta^{(0)}) - (X\beta + \alpha^{(0)} + \bo) = z(\eta^{(0)}) - \bo$
-    - $k = 1$
-2. Repeat Until Convergence:
-    - Coordinate descent loop -- repeat until convergence: 
-        - Precompute: $\bu = \text{diag}(\bX^T\Omega\bX)$
+    - $\beta = 0$
+    - $\eta = \bo$
+    - $\mu = g(\eta)$
+    - $\widetilde{\bw} = g'(\eta)$
+    - $\bz = \widetilde{\bW}^{-1}(y - g(\eta)) + \eta$
+    - $\br = \bz - \eta$
+2. Repeat until convergence: (outer proximal Newton loop)
+    - Precompute: 
+        - $\bu = \text{diag}(\bX^T\bW\widetilde{\bW}\bX)$
+    - Repeat until convergence: (inner coordinate descent loop)
         - For $i \in [p]$:
-            - Update working residual: $\br: \br + \bX_i\beta_i$
-            - Set $z = \br^T\Omega \bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g, -i}\|_1$
+            - Update working residual: $\br := \br + \bX_i\beta_i$
+            - Set $\zeta = \br^T\bW\widetilde{\bW}\bx_i$, $\tilde{\lambda} = n\lambda \|\beta_{g,-i}\|_1$
             - Update:
-              \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(z)\]
-            - Update working residual: $\br := \br - \bX_i\beta_i + \alpha 1_{n}$
-        - Update intercept: $\alpha := \langle \br, \text{diag}(\Omega)/n \rangle$
-        - Update working residual: $\br := \br - \alpha 1_{n}$
-    - Update quadratic approximation:
-        - $\beta^{(k)} = \beta$
-        - $\alpha^{(k)} = \alpha$
-        - $\eta^{(k)} = X\beta^{(k)} + \alpha^{(k)} + \bo$
-        - $z(\eta^{(k)})_j = \eta^{(k)}_j - \frac{\partial l_j/ \partial \eta_j}{\partial^2 l_j / \partial \eta_j^2}$
-        - $\omega_j^{(k)} = w_j * \frac{\partial^2 l_j}{\partial \eta_j^2}$
-        - $\br = z(\eta^{(k)}) - X\beta^{(k)} - \alpha^{(k)} - \bo$
-    - Set $k: = k + 1$
+                \[\beta_i = \frac{1}{u_i + n\lambda} \mathcal{S}_{\tilde{\lambda}}(\zeta)\]
+            - Update working residual: $\br := \br - \bx_i^T\beta_i$
+        - Update intercept:
+            - Update working residual: $\br := \br + \alpha$
+            - Update intercept: $\alpha = \langle \br, \text{diag}(\bW\tilde{\bW})/n \rangle$
+            - Update working residual: $\br := \br - \alpha$
+    - Update quadratic approximation: 
+        - $\eta = \bX\beta + \alpha + \bo$
+        - $\mu  = g(\eta)$
+        - $\widetilde{\bw} = g'(\eta)$
+        - $\bz = \widetilde{\bW}^{-1}(y - g(\eta)) + \eta$
+        - $\br = \bz - \eta$
 
-We note that the inner loop of this algorithm is essentially just our coordinate
-descent loop from above, but with weights $\Omega$ instead of $\bW$. Unlike the
-algorithm above, however, after each coordiante descent loop, we update the
-weights $\Omega$, as well as the working response $z$ and residuals. We only
-progress to the next value of $\lambda$ when the outer (quadratic approximation)
-loop converges. 
+The inverse link $g$ and weighting $g'$ functions are easily calculated, by simple 
+extensions of calculations performed above:
+
+| Family   | Inverse Link $g(x)$ | Weight Function $g'(x)$ |
+|---------:|:------------------------|:----------------------------|
+| Gaussian | $1$                     | $1$                         |
+| Logistic | $\textsf{inv-logit}(x) = 1 / (1 + e^{-x})$ | $(1 / (1 + e^{-x})) * (1 - 1 / (1 + e^{-x}))$
+| Poisson  | $\text{exp}(x)$ | $\text{exp}(x)$
+
+**FIXME: BACK-TRACKING STEP SIZE SELECTION**
 
 ## Stationary Conditions
 

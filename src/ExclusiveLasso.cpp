@@ -4,7 +4,7 @@
 #define EXLASSO_MAX_ITERATIONS_PROX 100
 #define EXLASSO_MAX_ITERATIONS_PG 50000
 #define EXLASSO_MAX_ITERATIONS_CD 10000
-#define EXLASSO_MAX_ITERATIONS_GLM 100
+#define EXLASSO_MAX_ITERATIONS_GLM 500
 #define EXLASSO_PREALLOCATION_FACTOR 10
 #define EXLASSO_RESIZE_FACTOR 2
 #define EXLASSO_FULL_LOOP_FACTOR 10
@@ -532,71 +532,62 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                                   double thresh_prox=1e-7,
                                   bool intercept=true){
 
-    arma::mat X1;
-
-    if(intercept){
-        arma::colvec one_vec = arma::ones(X.n_rows);
-        X1 = arma::join_rows(X, one_vec);
-    } else {
-        X1 = X;
-    }
-
-    arma::uword n = X1.n_rows;
-    arma::uword p = X1.n_cols;
+    arma::uword n = X.n_rows;
+    arma::uword p = X.n_cols;
     arma::uword n_lambda = lambda.n_elem;
 
     // Define helper functions for GLM SQA+CD
     //
-    // 1) l1 -- gradient of smooth portion of objective function.
-    //          Used in calculation of working response
-    // 2) l2 -- diagonal of Hessian of smooth portion of objective function.
-    //          Used to weight entries
+    // 1) `g` -- inverse link function (maps linear predictor to conditional mean)
+    // 2) `g_prime` -- derivative of `g` (maps to the conditional variance, though
+    //                 the SQA+CD algorithm doesn't use that fact)
     //
-    // Both take a vector (eta == linear predictor = X*beta + o) as input
+    // Both take a vector (eta == linear predictor = X*beta + alpha + offset) as input
     //
     // In many of these, we force evaluation of the return object
     // (which would otherwise be calculated lazily) to avoid a nasty segfault
     // resulting from un-mapped memory
 
-    std::function<arma::vec(const arma::vec&)> l1;
-    std::function<arma::vec(const arma::vec&)> l2;
+    std::function<arma::vec(const arma::vec&)> g;
+    std::function<arma::vec(const arma::vec&)> g_prime;
 
     if(family == EXLASSO_GLM_FAMILY_GAUSSIAN){
-        l1 = [&](const arma::vec& eta){
-            return ((eta - y)).eval();
+        g = [&](const arma::vec& eta){
+            return eta;
         };
 
-        l2 = [&](const arma::vec& eta){
+        g_prime = [&](const arma::vec& eta){
             return (arma::vec(eta.n_elem, arma::fill::ones)).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_LOGISTIC) {
-        l1 = [&](const arma::vec& eta){
-            return ((inv_logit(eta) - y)).eval();
+        g = [&](const arma::vec& eta){
+            return (inv_logit(eta)).eval();
         };
 
-        l2 = [&](const arma::vec& eta){
+        g_prime = [&](const arma::vec& eta){
             return ((inv_logit(eta)) % (1 - inv_logit(eta))).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_POISSON){
-        l1 = [&](const arma::vec& eta){
-            return ((arma::exp(eta) - y)).eval();
+        g = [&](const arma::vec& eta){
+            return (arma::exp(eta)).eval();
         };
 
-        l2 = [&](const arma::vec& eta){
+        g_prime = [&](const arma::vec& eta){
             return (arma::exp(eta)).eval();
         };
     } else {
         Rcpp::stop("[exclusive_lasso_glm] Unrecognized GLM family code.");
     }
 
+    double alpha = 0;
     arma::vec beta_working(p, arma::fill::zeros);
     arma::vec eta = o;
+    arma::vec mu  = g(eta);
+    arma::vec fitting_weights = g_prime(eta);
 
-    arma::vec l1_vec = l1(eta);
-    arma::vec l2_vec = l2(eta);
+    arma::vec z = (y - mu) / fitting_weights + eta;
+    arma::vec combined_weights = fitting_weights % w;
 
-    arma::vec z = o - l1_vec / l2_vec;
-    arma::vec omega = l2_vec % w;
     arma::vec r = z - o;
 
     // Like the working residual, we also store a working copy of
@@ -636,14 +627,19 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
     // to take advantage of
     // warm starts for sparsity
     for(int i=n_lambda - 1; i >= 0; i--){
+
         double nl = n * lambda(i);
+
+        K = 0; // Reset SQA loop counter
 
         do{ // Outer SQA Loop
             beta_sqa_old = beta_working;
             arma::vec u(p);
             for(uint i=0; i<p; i++){
-                u(i) = arma::sum(arma::square(X1.col(i)) % omega);
+                u(i) = arma::sum(arma::square(X.col(i)) % combined_weights);
             }
+
+            k = 0; // Reset CD loop counter
 
             do { // Inner CD Loop
                 beta_cd_old = beta_working;
@@ -654,39 +650,39 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                         continue;
                     }
 
-                    if(intercept & (j == p - 1)){
-                        // Don't need to threshold here, so simpler update
-                        const arma::vec xj = X1.col(j);
-
-                        r += xj * beta;
-                        beta = arma::dot(r % omega, xj) / n;
-                        r -= xj * beta;
-
-                        beta_working(j) = beta;
-                        continue;
-                    }
-
-                    const arma::vec xj = X1.col(j);
+                    const arma::vec xj = X.col(j);
                     r += xj * beta;
 
                     uint g = groups(j);
                     g_norms(g) -= fabs(beta);
 
-                    double z1 = arma::dot(r % omega, xj);
-                    double lambda_til = nl * g_norms(g);
+                    const double zeta = arma::dot(r % combined_weights, xj);
+                    const double lambda_til = nl * g_norms(g);
 
-                    beta = soft_thresh(z1, lambda_til) / (u(j) + nl);
+                    beta = soft_thresh(zeta, lambda_til) / (u(j) + nl);
                     r -= xj * beta;
-                    g_norms(g) += fabs(beta);
 
+                    g_norms(g) += fabs(beta);
                     beta_working(j) = beta;
                 }
 
+                if(intercept){
+                    r += alpha;
+                    // It's safe (and numerically stable) to renormalize weights here
+                    //
+                    // We don't generally normalize weights since we need the quadratic
+                    // approximation and the penalty to keep the correct ratio, but the
+                    // intercept does not appear in the penalty
+                    alpha = arma::dot(r, combined_weights) / arma::sum(combined_weights);
+                    r -= alpha;
+                }
+
                 k++; // Increment CD loop counter
+
                 if((k % EXLASSO_CHECK_USER_INTERRUPT_RATE) == 0){
                     Rcpp::checkUserInterrupt();
                 }
-                if(k >= EXLASSO_MAX_ITERATIONS_CD * EXLASSO_MAX_ITERATIONS_GLM * n_lambda){
+                if(k >= EXLASSO_MAX_ITERATIONS_CD){
                     Rcpp::stop("[ExclusiveLasso::exclusive_lasso_glm_cd] Maximum number of coordinate descent iterations reached.");
                 }
 
@@ -706,19 +702,20 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
             full_loop_count = 0;
 
             // Update SQA
-            eta = X1 * beta_working + o;
-            l1_vec = l1(eta);
-            l2_vec = l2(eta);
+            eta = X * beta_working + o + alpha;
+            mu  = g(eta);
+            fitting_weights = g_prime(eta);
 
-            z = eta - l1_vec / l2_vec;
-            omega = l2_vec % w;
+            z = (y - mu) / fitting_weights + eta;
+            combined_weights = fitting_weights % w;
             r = (z - eta);
 
             K += 1;
+
             if((K % EXLASSO_CHECK_USER_INTERRUPT_RATE_GLM) == 0){
                 Rcpp::checkUserInterrupt();
             }
-            if(K >= EXLASSO_MAX_ITERATIONS_GLM * n_lambda){
+            if(K >= EXLASSO_MAX_ITERATIONS_GLM){
                 Rcpp::stop("[ExclusiveLasso::exclusive_lasso_glm_cd] Maximum number of sequential quadratic approximations iterations reached.");
             }
 
@@ -733,27 +730,24 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
         // Load sparse matrix storage
         for(uint j=0; j < p; j++){
             if(beta_working(j) != 0){
-                if(intercept && (j == p - 1)){
-                    // Handle intercept specially
-                    Alpha(i) = beta_working(j);
-                } else {
-                    // We want to have a coefficient matrix
-                    // where rows are features and columns are values of lambda
-                    //
-                    // Armadillo's batch constructor takes (row, column) pairs
-                    // so we build as  (j = feature, i = lambda_index)
-                    Beta_storage_ind(0, beta_nnz) = j;
-                    Beta_storage_ind(1, beta_nnz) = i;
-                    Beta_storage_vec(beta_nnz) = beta_working(j);
-                    beta_nnz += 1;
-                }
+                // We want to have a coefficient matrix
+                // where rows are features and columns are values of lambda
+                //
+                // Armadillo's batch constructor takes (row, column) pairs
+                // so we build as  (j = feature, i = lambda_index)
+                Beta_storage_ind(0, beta_nnz) = j;
+                Beta_storage_ind(1, beta_nnz) = i;
+                Beta_storage_vec(beta_nnz) = beta_working(j);
+                beta_nnz += 1;
             }
         }
+
+        Alpha(i) = alpha;
     }
 
     arma::sp_mat Beta(Beta_storage_ind.cols(0, beta_nnz - 1),
                       Beta_storage_vec.subvec(0, beta_nnz - 1),
-                      intercept ? p - 1 : p, // Drop column of X if intercept
+                      p,
                       n_lambda);
 
     if(intercept){

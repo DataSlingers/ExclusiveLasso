@@ -149,12 +149,15 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     if(missing(weights)){
         weights <- rep(1, nobs)
     }
+
     if(length(weights) != nobs){
         stop(sQuote("NROW(X)"), " and ", sQuote("length(weights)"), " must match.")
     }
+
     if(any(weights <= 0)){
         stop("Observation weights must be strictly positive.")
     }
+
     if(sum(weights) != nobs){
         weights <- weights * nobs / sum(weights)
         warning(sQuote("sum(weights)"), " is not equal to ", sQuote("NROW(X)."), " Renormalizing...")
@@ -163,6 +166,7 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
     if(missing(offset)){
         offset <- rep(0, nobs)
     }
+
     if(length(offset) != nobs){
         stop(sQuote("NROW(X)"), " and ", sQuote("length(offset)"), " must match.")
     }

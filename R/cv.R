@@ -40,6 +40,9 @@
 #' # but can also specify lambda="lambda.min" or "lambda.1se"
 #' coef(exfit_cv, lambda="lambda.1se")
 cv.exclusive_lasso <- function(X, y, groups, ...,
+                               family = c("gaussian", "binomial", "poisson"),
+                               offset = rep(0, NROW(X)),
+                               weights = rep(1, NROW(X)),
                                type.measure=c("mse", "deviance", "class", "auc", "mae"),
                                nfolds=10, parallel=FALSE){
 
@@ -47,21 +50,26 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
 
     type.measure <- match.arg(type.measure)
 
-    if(type.measure != "mse"){
-        stop("Only", sQuote("mse"), "loss currently supported.")
+    ## The full data fit below will handle most input checking, but this needs to
+    ## be done here to be reflected in the CV fits
+    if(sum(weights) != NROW(X)){
+        weights <- weights * NROW(X) / sum(weights)
+        warning(sQuote("sum(weights)"), " is not equal to ", sQuote("NROW(X)."), " Renormalizing...")
     }
 
-    dots <- list(...)
-    if("offset" %in% names(dots)){
-        warning("Offsets not propogated during CV. Results may be unreliable.")
+    if ( (family != "binomial") && (type.measure %in% c("auc", "class")) ){
+        stop("Loss type ", sQuote(type.measure), " only defined for family = \"binomial.\"")
     }
 
-    if("weights" %in% names(dots)){
-        warning("Observation weights not propogated during CV. Results may be unreliable.")
+    if ( (type.measure %in% c("auc", "class")) && (!all(y %in% c(0, 1))) ) {
+        stop("Loss type ", sQuote(type.measure), " is only defined for 0/1 responses.")
     }
 
-    fit <- exclusive_lasso(X=X, y=y, groups=groups, ...)
-    lambdas <- fit$lambda
+    fit <- exclusive_lasso(X = X, y = y,
+                           groups = groups, family = family,
+                           offset = offset, weights = weights, ...)
+
+    lambda <- fit$lambda
 
     fold_ids <- split(sample(NROW(X)), rep(1:nfolds, length.out=NROW(X)))
 
@@ -69,15 +77,27 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
 
     i <- NULL ## Hack to avoid global variable warning in foreach call below
 
+    loss_func <- switch(type.measure,
+                        mse = function(test_true, test_pred, w) weighted.mean((test_true - test_pred)^2, w),
+                        mae = function(test_true, test_pred, w) weighted.mean(abs(test_true - test_pred), w),
+                        class = function(test_true, test_pred, w) weighted.mean(round(test_pred) == test_true, w),
+                        deviance = function(test_true, test_pred, w) weighted.mean(deviance_loss(y, mu, family), w),
+                        stop(sQuote(type.measure), "loss has not yet been implemented."))
+
     cv_err <- foreach(i=1:nfolds, .inorder=FALSE,
                       .packages=c("ExclusiveLasso", "Matrix")) %my.do% {
 
-            X_tr <- X[-fold_ids[[i]], ]; X_te <- X[fold_ids[[i]], ]
-            y_tr <- y[-fold_ids[[i]]]; y_te <- y[fold_ids[[i]]]
+            X_tr <- X[-fold_ids[[i]], ];           X_te <- X[fold_ids[[i]], ]
+            y_tr <- y[-fold_ids[[i]]];             y_te <- y[fold_ids[[i]]]
+            offset_tr <- offset[-fold_ids[[i]]];   offset_te <- offset[fold_ids[[i]]]
+            weights_tr <- weights[-fold_ids[[i]]]; weights_te <- weights[fold_ids[[i]]]
 
-            my_fit <- exclusive_lasso(X=X_tr, y=y_tr, groups=groups, ...)
+            my_fit <- exclusive_lasso(X = X_tr, y = y_tr, groups = groups, lambda=lambda,
+                                      ..., family = family, offset = offset_tr,
+                                      weights = weights_tr)
 
-            apply(predict(my_fit, newx=X_te), 2, function(y_hat) mean((y_te - y_hat)^2))
+            apply(predict(my_fit, newx=X_te, offset = offset_te), 2,
+                  function(y_hat) loss_func(y_te, y_hat, weights_te))
     }
 
     cv_err <- do.call(cbind, cv_err)
@@ -91,11 +111,19 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
                         c(m, se, up, lo)
                     })
 
-    lambda.min <- lambdas[which.min(cv_res[1,])]
-    lambda.1se <- lambdas[which.min(cv_res[3,])]
+    min_ix <- which.min(cv_res[1,])
+    lambda.min <- lambda[min_ix]
+
+    ## The "One-standard error" rule is defined as the largest lambda such that
+    ## CV(lambda) <= CV(lambda_min) + SE(CV(lambda_min)) where lambda_min is the
+    ## lambda giving minimal CV error
+
+    lambda_min_plus_1se <- cv_res[3, min_ix]
+    oneSE_ix <- max(which(cv_res[1,] <= lambda_min_plus_1se))
+    lambda.1se <- lambda[oneSE_ix]
 
     r <- list(fit=fit,
-              lambda=lambdas,
+              lambda=lambda,
               cvm=cv_res[1,],
               cvsd=cv_res[2,],
               cvup=cv_res[3,],
@@ -108,6 +136,18 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
     class(r) <- c("ExclusiveLassoFit_cv", class(r))
 
     r
+}
+
+#' @noRd
+#' Deviance Loss for CV -- we define this here for readability, but it's only used
+#' one small place inside CV
+deviance_loss <- function(y, mu, family = c("gaussian", "binomial", "poisson")){
+    family <- match.arg(family)
+
+    switch(family,
+           gaussian = (y - mu)^2,
+           binomial = y * mu - log(1 + exp(mu)),
+           poisson  = y * log(mu) - mu)
 }
 
 #' @export

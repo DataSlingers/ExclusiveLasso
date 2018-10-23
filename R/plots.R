@@ -131,6 +131,6 @@ plot.ExclusiveLassoFit_cv <- function(x, bar.width=0.01, ...){
              log_lambda + bar.width, x$cvup,
              col="darkgrey")
 
-    abline(v=log(x$lambda.min), lty=3)
-    abline(v=log(x$lambda.1se), lty=3)
+    abline(v=log(x$lambda.min), lty = 3, lwd = 2)
+    abline(v=log(x$lambda.1se), lty = 3, lwd = 2)
 }

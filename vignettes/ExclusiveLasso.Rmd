@@ -4,7 +4,7 @@ author:
  - name: Michael Weylandt
    affiliation: Department of Statistics, Rice University
    email: michael.weylandt@rice.edu
-date: "2017-10-12"
+date: "2018-10-23"
 output: 
   html_document: 
     toc: true
@@ -347,8 +347,6 @@ algorithm becomes:
         - Update working residual: $\br := \br - \alpha 1_{n}$
 
 ## Generalized Linear Models with the Exclusive Lasso Penalty
-
-**ExclusiveLasso GLMs are currently buggy!**
 
 The above methods can be generalized to arbitrary generalized linear models,
 though the `ExclusiveLasso` package only currently supports binomial (logistic)

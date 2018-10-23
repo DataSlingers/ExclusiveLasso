@@ -14,8 +14,8 @@ output:
 knitr::opts_chunk$set(
   echo=TRUE,
   collapse=TRUE,
-  comment="#>",
-  fig.path="figs/README-"
+  comment="#>", 
+  fig.path="man/figures/"
 )
 ```
 
@@ -64,7 +64,7 @@ y <- X %*% beta + rnorm(n)
 
 We fit the exclusive lasso to this data set, using a user-specified group structure:
 
-```{r}
+```{r, fig.width = 4, fig.height = 4}
 exfit <- exclusive_lasso(X, y, groups)
 print(exfit)
 plot(exfit)

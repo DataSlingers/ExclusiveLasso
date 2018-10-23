@@ -1,0 +1,31 @@
+template:
+  params:
+    bootswatch: flatly
+
+reference: 
+  - title: "Exclusive Lasso"
+    desc: >
+      Fit, visualize, and use GLMs with
+      the Exclusive Lasso Penalty
+    contents: 
+      - exclusive_lasso
+      - plot.ExclusiveLassoFit
+      - coef.ExclusiveLassoFit
+  - title: "Model Selection"
+    desc: >
+      Tune the exclusive lasso via
+      K-fold cross-validation
+    contents:
+      - cv.exclusive_lasso
+      - plot.ExclusiveLassoFit_cv
+
+navbar:
+  type: inverse
+  right:
+    - icon: fa-github fa-lg
+      href: https://github.com/DataSlingers/ExclusiveLasso
+
+development:
+  mode: unreleased
+  version_label: info
+  version_tooltip: "ExclusiveLasso is not yet on CRAN"

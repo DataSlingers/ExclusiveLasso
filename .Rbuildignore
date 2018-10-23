@@ -1,0 +1,16 @@
+## CI Files
+^\.travis\.yml$
+^codecov\.yml$
+^appveyor\.yml$
+
+## RStudio Files
+^.*\.Rproj$
+^\.Rproj\.user$
+
+## Pkgdown docs
+^docs$
+
+## GH files (not part of package)
+.gitignore.deploy
+README.Rmd
+^data-raw$

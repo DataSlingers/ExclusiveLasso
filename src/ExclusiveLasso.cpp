@@ -796,6 +796,7 @@ arma::mat calculate_exclusive_lasso_df(const arma::mat& X,
         const arma::mat X_S = X.cols(S);
         const arma::mat proj_mat = X_S * arma::solve(X_S.t() * X_S + X.n_rows * lambda * M.submat(S, S), X_S.t());
         res(ix) = arma::trace(proj_mat);
+        Rcpp::checkUserInterrupt();
     }
 
     return res;

@@ -233,13 +233,13 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         }
     } else {
         if(algorithm == "cd"){
-            res <- exclusive_lasso_glm_cd(X=Xsc, y=y, group=groups,
+            res <- exclusive_lasso_glm_cd(X=Xsc, y=y, groups=groups,
                                           lambda=lambda, w=weights, o=offset,
                                           family=GLM_FAMILIES[family],
                                           thresh=thresh, thresh_prox=thresh_prox,
                                           intercept=intercept)
         } else {
-            res <- exclusive_lasso_glm_pg(X=Xsc, y=y, group=groups,
+            res <- exclusive_lasso_glm_pg(X=Xsc, y=y, groups=groups,
                                           lambda=lambda, w=weights, o=offset,
                                           family=GLM_FAMILIES[family],
                                           thresh=thresh, thresh_prox=thresh_prox,

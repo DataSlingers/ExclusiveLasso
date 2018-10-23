@@ -14,6 +14,15 @@
 #' @param parallel Should CV run in parallel? If a parallel back-end for the
 #'    \code{foreach} package is registered, it will be used. See the
 #'    \code{foreach} documentation for details of different backends.
+#' @param family The GLM response type. (Cf. the \code{family} argument of
+#'               \code{\link[stats]{glm}})
+#' @param weights Weights applied to individual
+#'     observations. If not supplied, all observations will be equally
+#'     weighted. Will be re-scaled to sum to \eqn{n} if
+#'     necessary. (Cf. the \code{weight} argument of
+#'     \code{\link[stats]{lm}})
+#' @param offset A vector of length \eqn{n} included in the linear
+#'     predictor.
 #' @details As discussed in Appendix F of Campbell and Allen [1], cross-validation
 #'    can be quite unstable for exclusive lasso problems. Model selection by BIC
 #'    or EBIC tends to perform better in practice.
@@ -81,7 +90,7 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
                         mse = function(test_true, test_pred, w) weighted.mean((test_true - test_pred)^2, w),
                         mae = function(test_true, test_pred, w) weighted.mean(abs(test_true - test_pred), w),
                         class = function(test_true, test_pred, w) weighted.mean(round(test_pred) == test_true, w),
-                        deviance = function(test_true, test_pred, w) weighted.mean(deviance_loss(y, mu, family), w),
+                        deviance = function(test_true, test_pred, w) weighted.mean(deviance_loss(test_true, test_pred, family), w),
                         stop(sQuote(type.measure), "loss has not yet been implemented."))
 
     cv_err <- foreach(i=1:nfolds, .inorder=FALSE,

@@ -271,7 +271,7 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
 
         g = [&](const arma::vec& beta){
             arma::vec linear_predictor = X1 * beta + o;
-            return (-X1.t() * arma::diagmat(w/n) * (y - arma::exp(linear_predictor))/n).eval();
+            return (-X1.t() * arma::diagmat(w/n) * (y - arma::exp(linear_predictor))).eval();
         };
     } else {
         Rcpp::stop("[exclusive_lasso_glm] Unrecognized GLM family code.");

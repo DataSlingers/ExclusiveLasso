@@ -8,7 +8,7 @@ test_that("Input validation works", {
     g <- 10
 
     X <- matrix(rnorm(n * p), ncol=p)
-    y <- rpois(n, 3)
+    y <- rpois(n, 5)
     groups <- rep(1:g, length.out=p)
 
     weights <- runif(n, 0.5, 1.5); weights <- weights / sum(weights) * n;
@@ -23,7 +23,15 @@ test_that("Input validation works", {
                                   thresh=thresh, thresh_prox=thresh_prox))
 
     ## Wrong domain for y
+
+    ## All negatives
     expect_error(exclusive_lasso(X, -y, groups=groups,
+                                 weights=weights, offset=offset,
+                                 lambda=lambda, family="poisson",
+                                 thresh=thresh, thresh_prox=thresh_prox))
+
+    ## Some negatives
+    expect_error(exclusive_lasso(X, y * c(1, -1), groups=groups,
                                  weights=weights, offset=offset,
                                  lambda=lambda, family="poisson",
                                  thresh=thresh, thresh_prox=thresh_prox))
@@ -105,7 +113,6 @@ test_that("Input validation works", {
                                    weights=weights, offset=offset,
                                    lambda=rev(lambda), family="poisson",
                                    thresh=thresh, thresh_prox=thresh_prox))
-
 })
 
 test_that("Dynamic defaults work", {
@@ -116,7 +123,7 @@ test_that("Dynamic defaults work", {
     g <- 10
 
     X <- matrix(rnorm(n * p), ncol=p)
-    y <- rpois(n, 5)
+    y <- rpois(n, 4)
     groups <- rep(1:g, length.out=p)
 
     elfit <- exclusive_lasso(X, y, groups,
@@ -142,7 +149,7 @@ test_that("Preserves column names", {
 
     X <- matrix(rnorm(n * p), ncol=p);
     colnames(X) <- paste0("A", 1:p)
-    y <- rpois(n, 5)
+    y <- rpois(n, 3)
     groups <- rep(1:g, length.out=p)
 
     elfit <- exclusive_lasso(X, y, groups,
@@ -166,8 +173,8 @@ test_that("Standardization works", {
 
     colnames(X) <- paste0("A", 1:p)
 
-    beta <- rep(0, p); beta[1:g] <- -2
-    y <- exp(4 + X %*% beta + rnorm(n))
+    beta <- rep(0, p); beta[1:g] <- 0.2
+    y <- rpois(n, exp(1 + X %*% beta))
     groups <- rep(1:g, length.out=p)
 
     X_sc <- X; X_sc[] <- scale(X_sc)
@@ -190,24 +197,101 @@ test_that("Standardization works", {
     ## then elfit_sc$coef gets divided
     expect_equal(elfit$coef,
                  elfit_sc$coef / attr(scale(X), "scaled:scale"))
-
 })
 
-test_that("CD and PG get the same answer", {
-    set.seed(180)
 
+test_that("Poisson returns ridge with trivial group structure", {
+    skip_if_not_installed("glmnet") ## For a poisson ridge implementation
+    library(glmnet)
+    set.seed(200)
+
+    ## Low-Dimensional
     n <- 200
-    p <- 50
-    groups <- rep(1:5, 10)
+    p <- 20
+    groups <- 1:p
 
-    beta <- rep(0, p)
-    beta[1:5] <- -2
+    beta <- rep(0.2, p)
+    X <- matrix(rnorm(n * p), ncol=p); X[] <- scale(X)
+    y <- rpois(n, exp(X %*% beta))
 
-    X <- matrix(rnorm(n * p), ncol=p)
-    y <- exp(4 + X %*% beta)
+    nlambda <- 10
 
-    fit1 <- exclusive_lasso(X, y, groups, family="poisson", algorithm="pg",
-                            nlambda=10, thresh=1e-10, thresh_prox=1e-10)
-    fit2 <- exclusive_lasso(X, y, groups, family="poisson", algorithm="cd",
-                            nlambda=10, thresh=1e-10, thresh_prox=1e-10)
+    elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
+                             family = "poisson",
+                             intercept=FALSE, standardize=FALSE,
+                             thresh=1e-14, thresh_prox=1e-14)
+
+    glfit <- glmnet(X, y, family = "poisson", intercept = FALSE,
+                    lambda = rev(elfit$lambda), standardize = FALSE,
+                    alpha = 0, thresh = 1e-20)
+
+    for(i in seq_len(nlambda)){
+        ## Glmnet returns coefficients 'reversed' compared to how we do it
+        expect_equal(coef(elfit)[, i], coef(glfit)[,nlambda - i + 1],
+                     check.attributes = FALSE)
+    }
+
+    ## Now with intercepts
+    elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
+                             family = "poisson",
+                             intercept=TRUE, standardize=FALSE,
+                             thresh=1e-14, thresh_prox=1e-14)
+
+    glfit <- glmnet(X, y, family = "poisson", intercept = TRUE,
+                    lambda = rev(elfit$lambda), standardize = FALSE,
+                    alpha = 0, thresh = 1e-20)
+
+    for(i in seq_len(nlambda)){
+        ## Glmnet returns coefficients 'reversed' compared to how we do it
+        expect_equal(coef(elfit)[, i], coef(glfit)[,nlambda - i + 1],
+                     check.attributes = FALSE)
+    }
+
+    ## High-Dimensional
+
+    ## FIXME -- This test doesn't work for us or for glmnet....
+    # n <- 200
+    # p <- 500
+    # groups <- 1:p
+    #
+    # beta <- numeric(p); beta[1:5] <- c(-3, 3, 1, -2, 1) / 5
+    #
+    # X <- matrix(rnorm(n * p), ncol=p); X[] <- scale(X)
+    # y <- rpois(n, exp(3 - X %*% beta))
+    #
+    # nlambda <- 10
+    #
+    # elfit <- exclusive_lasso(X, y, groups, nlambda=nlambda,
+    #                          family = "poisson",
+    #                          intercept=FALSE, standardize=FALSE,
+    #                          thresh=1e-14, thresh_prox=1e-14)
+    #
+    # glfit <- glmnet(X, y, family = "poisson", intercept = FALSE,
+    #                 lambda = rev(elfit$lambda), standardize = FALSE,
+    #                 alpha = 0, thresh = 1e-20)
+    #
+    # for(i in seq_len(nlambda)){
+    #     ## Glmnet returns coefficients 'reversed' compared to how we do it
+    #     expect_equal(coef(elfit)[, i], coef(glfit)[,nlambda - i + 1], check.attributes = FALSE)
+    # }
+})
+
+test_that("CD and PG solvers get the same result for Poisson GLMs", {
+    set.seed(55)
+    n <- 400
+    p <- 40
+
+    groups <- rep(1:4, length.out=p)
+
+    X <- matrix(rnorm(n * p), ncol=p); X[] <- scale(X)
+    beta <- rep(0, p); beta[1:4] <- 0.25
+    y <- round(exp(X %*% beta))
+
+    fit1 <- exclusive_lasso(X, y, groups, algorithm="cd", family="poisson",
+                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE)
+    fit2 <- exclusive_lasso(X, y, groups, algorithm="pg", family="poisson",
+                            thresh=1e-14, thresh_prox=1e-14, intercept=TRUE)
+
+    ## Be a bit looser here than strictly necessary since we are using inexact PG
+    expect_equal(coef(fit1), coef(fit2), tolerance = 1e-6)
 })

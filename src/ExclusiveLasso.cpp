@@ -51,8 +51,10 @@ double exclusive_lasso_penalty(const arma::vec& x, const arma::ivec& groups){
 }
 
 // [[Rcpp::export]]
-arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
-                               double lambda, double thresh=1e-7){
+arma::vec exclusive_lasso_prox(const arma::vec& z,
+                               const arma::ivec& groups,
+                               double lambda,
+                               double thresh=1e-7){
 
     arma::uword p = z.n_elem;
     arma::vec beta(p);

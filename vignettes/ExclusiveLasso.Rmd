@@ -60,11 +60,11 @@ in detail below.
 ## Usage
 
 The `ExclusiveLasso` package implements the exclusive lasso penalty
-[@Zhou:2010, @Campbell:2017] for structured variable selection. The interface
+[@Zhou:2010; @Campbell:2017] for structured variable selection. The interface
 and internal design intentionally mimic those of the `glmnet` package [@Friedman:2010]
 and, by extension, other sparse regression packages which follow `glmnet`,
 notably `ncvreg` for non-convex regularization and `grpreg` for the group
-lasso penalty [@Breheny:2011, @Breheny:2015].
+lasso penalty [@Breheny:2011; @Breheny:2015].
 
 We demonstrate its use on a small simulated data set:
 
@@ -132,9 +132,6 @@ log-likelihood yielding the problem:^[Below, when observation weights are includ
 they will be included in the definition of $\ell$, but not of the $l_i$ terms.]
 
 \[\hat{\beta}_{\text{EL}} = \argmin \ell(\by; \bX\beta) + \lambda\sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}\]
-
-^[Below, when observation weights are included, they will be included in the definition of $\ell$, but
-not of the $l_i$ terms.]
 
 In the Gaussian case, this can be simplified to
 \[\hat{\beta}_{\text{EL}} = \argmin \frac{1}{2n}\|\by - \bX\beta\|_2^2 + \underbrace{\lambda \sum_{g \in \mathcal{G}} \frac{\|\beta_g\|_1^2}{2}}_{\lambda * P(\beta)} \tag{EL-Gaussian} \label{eq:el-gaussian}\]

@@ -255,6 +255,9 @@ weight matrix $\bW$ and an intercept term $\alpha$, the combined algorithm becom
     - $\beta^{(k)} = x$
     - $\alpha^{(k)} = \left\langle \text{diag}(\bW)/n, \by - \bo - \bX\beta\right\rangle$
     - $k := k + 1$.
+    
+If we wish to include box constraints of the form $l_i \leq \beta_i \leq u_i$, we
+can simply directly impose these after each soft-thresholding step.
 
 ### Coordinate Descent
 
@@ -288,7 +291,7 @@ Using similar algebra as before:
 \[\begin{align*}
 &\argmin_{\beta_i} \frac{1}{2n} \|\br - \bx_i\beta_i\|_2^2 + \frac{\lambda}{2}\left(|\beta_i| + \|\beta_{g,-i}\|_1\right)^2 \\
 \implies & \argmin_{\beta_i} \frac{1}{2} \|\br - \bx_i\beta_i\|_2^2 + \frac{n\lambda}{2}\left(|\beta_i| + \|\beta_{g,-i}\|_1\right)^2 \\
-\implies & \argmin_{\beta_i} \frac{\|\br\|_2^2 - 2\br^T\bx_i\beta_i + \|\bx_i\|_2^2\beta_i^2 + n\lambda(\beta_i^2 + 2|\beta_i| * \|\beta_{g,-i}\|_1 + \|\beta_{g,-i}\|_1^2}{2} \\
+\implies & \argmin_{\beta_i} \frac{\|\br\|_2^2 - 2\br^T\bx_i\beta_i + \|\bx_i\|_2^2\beta_i^2 + n\lambda(\beta_i^2 + 2|\beta_i| * \|\beta_{g,-i}\|_1 + \|\beta_{g,-i}\|_1^2)}{2} \\
 \implies & \argmin_{\beta_i} \frac{\beta_i^2 (\|\bx_i\|_2^2 + n\lambda) - 2\br^T\bx_i\beta_i + 2n\lambda |\beta_i| * \|\beta_{g, -i}\|_1}{2} \\
 \implies & \argmin_{\beta_i} n\lambda\|\beta_{g,-i}\|_1 * |\beta_i| +\frac{1}{2}\left(\beta_i^2 (\|\bx_i\|_2^2 + n\lambda) - 2\br^T\bx_i\beta_i \right) \\
 \implies & \argmin_{\beta_i} \frac{n\lambda\|\beta_{g,-i}\|_1}{\|\bx_i\|_2^2 + n\lambda} * |\beta_i| +\frac{1}{2(\|\bx_i\|_2^2 + n\lambda)}\left(\beta_i^2 (\|\bx_i\|_2^2 + n\lambda) - 2\br^T\bx_i\beta_i \right) \\
@@ -342,6 +345,9 @@ algorithm becomes:
         - Update working residual: $\br: \br + \alpha 1_n$
         - Update intercept: $\alpha := \langle \br, \text{diag}(\bW)/n \rangle$
         - Update working residual: $\br := \br - \alpha 1_{n}$
+        
+If we wish to include box constraints of the form $l_i \leq \beta_i \leq u_i$, we
+can simply directly impose these after each soft-thresholding step.
 
 ## Generalized Linear Models with the Exclusive Lasso Penalty
 
@@ -438,6 +444,8 @@ The final algorithm is then:
 where $\ell$ is the smooth part of the objective function (*i.e.*, the negative 
 log-likelihood), and the proximal operator is evaluated using the coordinate-descent
 scheme described above.
+
+Box constraints can be imposed in the proximal operator, as described above.
 
 ### Coordinate Descent Algorithm
 
@@ -545,6 +553,9 @@ scheme derived above, yielding our proximal Newton algorithm:
         - $\widetilde{\bw} = g'(\eta)$
         - $\bz = \widetilde{\bW}^{-1}(y - g(\eta)) + \eta$
         - $\br = \bz - \eta$
+
+If we wish to include box constraints of the form $l_i \leq \beta_i \leq u_i$, we
+can simply directly impose these after each soft-thresholding step.
 
 The inverse link $g$ and weighting $g'$ functions are easily calculated, by simple 
 extensions of calculations performed above:

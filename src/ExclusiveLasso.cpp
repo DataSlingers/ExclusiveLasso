@@ -1,4 +1,6 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
+#include <limits>
+
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE 50
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE_GLM 10
 #define EXLASSO_MAX_ITERATIONS_PROX 100
@@ -13,6 +15,7 @@
 #define EXLASSO_GLM_FAMILY_LOGISTIC 1
 #define EXLASSO_GLM_FAMILY_POISSON  2
 #define EXLASSO_BACKTRACK_BETA 0.8
+#define EXLASSO_INF std::numeric_limits<double>::infinity()
 
 // We only include RcppArmadillo.h which pulls Rcpp.h in for us
 #include "RcppArmadillo.h"
@@ -58,6 +61,8 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
                                const arma::vec& upper_bound,
                                double thresh=1e-7){
 
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
+
     arma::uword p = z.n_elem;
     arma::vec beta(p);
 
@@ -81,8 +86,10 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
                 beta_g(i) = 1/(lambda + 1) * soft_thresh(z_g(i), lambda * thresh_level);
 
                 // Impose box constraints
-                beta_g(i) = std::fmax(beta_g(i), lower_bound(i));
-                beta_g(i) = std::fmin(beta_g(i), upper_bound(i));
+                if(apply_box_constraints){
+                    beta_g(i) = std::fmax(beta_g(i), lower_bound(i));
+                    beta_g(i) = std::fmin(beta_g(i), upper_bound(i));
+                }
             }
 
             k++;
@@ -421,6 +428,8 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
     arma::uword p = X.n_cols;
     arma::uword n_lambda = lambda.n_elem;
 
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
+
     arma::vec r = y - o;
     arma::vec beta_working(p, arma::fill::zeros);
     double alpha = 0;
@@ -485,8 +494,10 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                 beta = soft_thresh(z, lambda_til) / (u(j) + nl);
 
                 // Box constraints
-                beta = std::fmax(beta, lower_bound(j));
-                beta = std::fmin(beta, upper_bound(j));
+                if(apply_box_constraints){
+                    beta = std::fmax(beta, lower_bound(j));
+                    beta = std::fmin(beta, upper_bound(j));
+                }
 
                 r -= xj * beta;
                 g_norms(g) += fabs(beta);
@@ -580,6 +591,8 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
     arma::uword n_lambda = lambda.n_elem;
+
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
 
     // Define helper functions for GLM SQA+CD
     //
@@ -707,8 +720,10 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
                     beta = soft_thresh(zeta, lambda_til) / (u(j) + nl);
 
                     // Box constraints
-                    beta = std::fmax(beta, lower_bound(j));
-                    beta = std::fmin(beta, upper_bound(j));
+                    if(apply_box_constraints){
+                        beta = std::fmax(beta, lower_bound(j));
+                        beta = std::fmin(beta, upper_bound(j));
+                    }
 
                     r -= xj * beta;
 

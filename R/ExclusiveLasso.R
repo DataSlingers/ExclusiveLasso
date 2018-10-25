@@ -47,6 +47,12 @@ GLM_FAMILIES <- c(gaussian=0,
 #'    penalized regression problem.
 #' @param thresh_prox The convergence threshold used for the
 #'    coordinate-descent algorithm used to evaluate the proximal operator.
+#' @param lower.limits A vector of lower bounds for each coefficient (default \code{-Inf}).
+#'                     Can either be a scalar (applied to each coefficient) or a vector
+#'                     of length \code{p} (number of coefficients).
+#' @param upper.limits A vector of lower bounds for each coefficient (default \code{Inf}).
+#'                     Can either be a scalar (applied to each coefficient) or a vector
+#'                     of length \code{p} (number of coefficients).
 #' @param skip_df Should the DF calculations be skipped? They are often slower
 #'    than the actual model fitting; if calling \code{exclusive_lasso} repeatedly
 #'    it may be useful to skip these calculations.
@@ -93,6 +99,8 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
                             weights, offset, nlambda=100,
                             lambda.min.ratio=ifelse(nobs < nvars, 0.01, 1e-04),
                             lambda, standardize=TRUE, intercept=TRUE,
+                            lower.limits = rep(-Inf, nvars),
+                            upper.limits = rep(Inf, nvars),
                             thresh=1e-07, thresh_prox=thresh,
                             skip_df=FALSE,
                             algorithm=c("cd", "pg")){
@@ -218,16 +226,46 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
         stop(sQuote("thresh"), " must be positive.")
     }
 
+    if(any(is.na(upper.limits)) || any(is.nan(upper.limits))){
+        stop(sQuote("upper.limits"), " should be either finite or +/-Inf.")
+    }
+
+    if(any(is.na(upper.limits)) || any(is.nan(lower.limits))){
+        stop(sQuote("lower.limits"), " should be either finite or +/-Inf.")
+    }
+
+    if(length(lower.limits) == 1L){
+        lower.limits <- rep(lower.limits, nvars)
+    }
+
+    if(length(upper.limits) == 1L){
+        upper.limits <- rep(upper.limits, nvars)
+    }
+
+    if(length(upper.limits) != nvars){
+        stop(sQuote("upper.limits"), " must be of length ", sQuote("NCOL(X)."))
+    }
+
+    if(length(lower.limits) != nvars){
+        stop(sQuote("lower.limits"), " must be of length ", sQuote("NCOL(X)."))
+    }
+
+    if(any(upper.limits <= lower.limits)){
+        stop(sQuote("upper.limits"), " must be strictly greater than ", sQuote("lower.limits."))
+    }
+
     algorithm <- match.arg(algorithm)
 
     if((family == "gaussian") && getOption("ExclusiveLasso.gaussian_fast_path", TRUE)){
         if(algorithm == "cd"){
             res <- exclusive_lasso_gaussian_cd(X=Xsc, y=y, groups=groups,
                                                lambda=lambda, w=weights, o=offset,
+                                               lower_bound=lower.limits, upper_bound=upper.limits,
                                                thresh=thresh, intercept=intercept)
         } else {
             res <- exclusive_lasso_gaussian_pg(X=Xsc, y=y, groups=groups,
                                                lambda=lambda, w=weights, o=offset,
+                                               lower_bound=lower.limits, upper_bound=upper.limits,
                                                thresh_prox=thresh_prox, thresh=thresh,
                                                intercept=intercept)
         }
@@ -236,12 +274,14 @@ exclusive_lasso <- function(X, y, groups, family=c("gaussian", "binomial", "pois
             res <- exclusive_lasso_glm_cd(X=Xsc, y=y, groups=groups,
                                           lambda=lambda, w=weights, o=offset,
                                           family=GLM_FAMILIES[family],
+                                          lower_bound=lower.limits, upper_bound=upper.limits,
                                           thresh=thresh, thresh_prox=thresh_prox,
                                           intercept=intercept)
         } else {
             res <- exclusive_lasso_glm_pg(X=Xsc, y=y, groups=groups,
                                           lambda=lambda, w=weights, o=offset,
                                           family=GLM_FAMILIES[family],
+                                          lower_bound=lower.limits, upper_bound=upper.limits,
                                           thresh=thresh, thresh_prox=thresh_prox,
                                           intercept=intercept)
         }

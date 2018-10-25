@@ -1,4 +1,11 @@
 context("Gaussian response exclusive lasso works")
+
+prox <- function(x, ...) {
+    as.vector(ExclusiveLasso:::exclusive_lasso_prox(x, ...,
+                                                    upper_bound = rep(Inf, length(x)),
+                                                    lower_bound = rep(-Inf, length(x))))
+}
+
 ## This focuses on the specialized gaussian fast path
 
 test_that("Input validation works", {
@@ -207,8 +214,7 @@ test_that("Returns prox for orthogonal case", {
 
     elfit <- exclusive_lasso(X, y, groups, lambda=lambda,
                              standardize=FALSE, intercept=FALSE, skip_df = TRUE)
-    prox_coefs <- ExclusiveLasso:::exclusive_lasso_prox(crossprod(X, y),
-                                                        groups, lambda * n)
+    prox_coefs <- prox(crossprod(X, y), groups, lambda * n)
 
     expect_equal(as.matrix(elfit$coef), prox_coefs, check.attributes=FALSE)
 })

@@ -1,4 +1,6 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
+#include <limits>
+
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE 50
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE_GLM 10
 #define EXLASSO_MAX_ITERATIONS_PROX 100
@@ -13,6 +15,7 @@
 #define EXLASSO_GLM_FAMILY_LOGISTIC 1
 #define EXLASSO_GLM_FAMILY_POISSON  2
 #define EXLASSO_BACKTRACK_BETA 0.8
+#define EXLASSO_INF std::numeric_limits<double>::infinity()
 
 // We only include RcppArmadillo.h which pulls Rcpp.h in for us
 #include "RcppArmadillo.h"
@@ -51,8 +54,14 @@ double exclusive_lasso_penalty(const arma::vec& x, const arma::ivec& groups){
 }
 
 // [[Rcpp::export]]
-arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
-                               double lambda, double thresh=1e-7){
+arma::vec exclusive_lasso_prox(const arma::vec& z,
+                               const arma::ivec& groups,
+                               double lambda,
+                               const arma::vec& lower_bound,
+                               const arma::vec& upper_bound,
+                               double thresh=1e-7){
+
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
 
     arma::uword p = z.n_elem;
     arma::vec beta(p);
@@ -75,6 +84,12 @@ arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
             for(int i=0; i<g_n_elem; i++){
                 double thresh_level = arma::norm(beta_g, 1) - fabs(beta_g(i));
                 beta_g(i) = 1/(lambda + 1) * soft_thresh(z_g(i), lambda * thresh_level);
+
+                // Impose box constraints
+                if(apply_box_constraints){
+                    beta_g(i) = std::fmax(beta_g(i), lower_bound(i));
+                    beta_g(i) = std::fmin(beta_g(i), upper_bound(i));
+                }
             }
 
             k++;
@@ -89,10 +104,16 @@ arma::vec exclusive_lasso_prox(arma::vec z, const arma::ivec& groups,
 }
 
 // [[Rcpp::export]]
-Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
-                                       const arma::ivec& groups, const arma::vec& lambda,
-                                       const arma::vec& w, const arma::vec& o,
-                                       double thresh=1e-7, double thresh_prox=1e-7,
+Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X,
+                                       const arma::vec& y,
+                                       const arma::ivec& groups,
+                                       const arma::vec& lambda,
+                                       const arma::vec& w,
+                                       const arma::vec& o,
+                                       const arma::vec& lower_bound,
+                                       const arma::vec& upper_bound,
+                                       double thresh=1e-7,
+                                       double thresh_prox=1e-7,
                                        bool intercept=true){
 
     arma::uword n = X.n_rows;
@@ -129,7 +150,12 @@ Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
         do {
             beta_old = beta;
             arma::vec z = beta + 1/L * (Xty - N * alpha - XtX * beta);
-            beta = exclusive_lasso_prox(z, groups, lambda(i)/L, thresh_prox);
+            beta = exclusive_lasso_prox(z,
+                                        groups,
+                                        lambda(i)/L,
+                                        lower_bound,
+                                        upper_bound,
+                                        thresh_prox);
 
             if(intercept){
                 alpha = arma::dot(w/n, y - o - X * beta);
@@ -185,10 +211,16 @@ Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X, const arma::vec& y,
 }
 
 // [[Rcpp::export]]
-Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
-                                  const arma::ivec& groups, const arma::vec& lambda,
-                                  const arma::vec& w, const arma::vec& o,
-                                  int family, double thresh=1e-7,
+Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X,
+                                  const arma::vec& y,
+                                  const arma::ivec& groups,
+                                  const arma::vec& lambda,
+                                  const arma::vec& w,
+                                  const arma::vec& o,
+                                  int family,
+                                  const arma::vec& lower_bound,
+                                  const arma::vec& upper_bound,
+                                  double thresh=1e-7,
                                   double thresh_prox=1e-7,
                                   bool intercept=true){
 
@@ -284,14 +316,18 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
     if(intercept){
         prox = [&](const arma::vec& beta, double lambda){
             arma::vec ret(p);
-            ret.head(p-1) = exclusive_lasso_prox(beta.head(p-1), groups,
-                                                 lambda, thresh_prox);
+            ret.head(p-1) = exclusive_lasso_prox(beta.head(p-1),
+                                                 groups,
+                                                 lambda,
+                                                 lower_bound,
+                                                 upper_bound,
+                                                 thresh_prox);
             ret(p-1) = beta(p-1);
             return ret;
         };
     } else {
         prox = [&](const arma::vec& beta, double lambda){
-            return exclusive_lasso_prox(beta, groups, lambda, thresh_prox);
+            return exclusive_lasso_prox(beta, groups, lambda, lower_bound, upper_bound, thresh_prox);
         };
     }
 
@@ -377,14 +413,22 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X, const arma::vec& y,
 
 
 // [[Rcpp::export]]
-Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
-                                       const arma::ivec& groups, const arma::vec& lambda,
-                                       const arma::vec& w, const arma::vec& o,
-                                       double thresh=1e-7, bool intercept=true){
+Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
+                                       const arma::vec& y,
+                                       const arma::ivec& groups,
+                                       const arma::vec& lambda,
+                                       const arma::vec& w,
+                                       const arma::vec& o,
+                                       const arma::vec& lower_bound,
+                                       const arma::vec& upper_bound,
+                                       double thresh=1e-7,
+                                       bool intercept=true){
 
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
     arma::uword n_lambda = lambda.n_elem;
+
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
 
     arma::vec r = y - o;
     arma::vec beta_working(p, arma::fill::zeros);
@@ -448,6 +492,13 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
                 double lambda_til = nl * g_norms(g);
 
                 beta = soft_thresh(z, lambda_til) / (u(j) + nl);
+
+                // Box constraints
+                if(apply_box_constraints){
+                    beta = std::fmax(beta, lower_bound(j));
+                    beta = std::fmin(beta, upper_bound(j));
+                }
+
                 r -= xj * beta;
                 g_norms(g) += fabs(beta);
 
@@ -524,10 +575,15 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X, const arma::vec& y,
 
 
 // [[Rcpp::export]]
-Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
-                                  const arma::ivec& groups, const arma::vec& lambda,
-                                  const arma::vec& w, const arma::vec& o,
+Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
+                                  const arma::vec& y,
+                                  const arma::ivec& groups,
+                                  const arma::vec& lambda,
+                                  const arma::vec& w,
+                                  const arma::vec& o,
                                   int family,
+                                  const arma::vec& lower_bound,
+                                  const arma::vec& upper_bound,
                                   double thresh=1e-7,
                                   double thresh_prox=1e-7,
                                   bool intercept=true){
@@ -535,6 +591,8 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
     arma::uword n = X.n_rows;
     arma::uword p = X.n_cols;
     arma::uword n_lambda = lambda.n_elem;
+
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
 
     // Define helper functions for GLM SQA+CD
     //
@@ -660,6 +718,13 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X, const arma::vec& y,
                     const double lambda_til = nl * g_norms(g);
 
                     beta = soft_thresh(zeta, lambda_til) / (u(j) + nl);
+
+                    // Box constraints
+                    if(apply_box_constraints){
+                        beta = std::fmax(beta, lower_bound(j));
+                        beta = std::fmin(beta, upper_bound(j));
+                    }
+
                     r -= xj * beta;
 
                     g_norms(g) += fabs(beta);

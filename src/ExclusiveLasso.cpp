@@ -14,6 +14,7 @@
 #define EXLASSO_GLM_FAMILY_GAUSSIAN 0
 #define EXLASSO_GLM_FAMILY_LOGISTIC 1
 #define EXLASSO_GLM_FAMILY_POISSON  2
+#define EXLASSO_BACKTRACK_ALPHA 0.5
 #define EXLASSO_BACKTRACK_BETA 0.8
 #define EXLASSO_INF std::numeric_limits<double>::infinity()
 
@@ -596,20 +597,36 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 
     // Define helper functions for GLM SQA+CD
     //
-    // 1) `g` -- inverse link function (maps linear predictor to conditional mean)
-    // 2) `g_prime` -- derivative of `g` (maps to the conditional variance, though
+    // 1) `f` -- negative log-likelihood (smooth part of objective function)
+    // 2) `f_prime` -- derivative of `f` with respect to the input (beta)
+    //
+    // 3) `g` -- inverse link function (maps linear predictor to conditional mean)
+    // 4) `g_prime` -- derivative of `g` (maps to the conditional variance, though
     //                 the SQA+CD algorithm doesn't use that fact)
     //
-    // Both take a vector (eta == linear predictor = X*beta + alpha + offset) as input
+    // Note that all of these functions take the linear predictor
+    // (eta := X*beta + alpha + offset) as input even when they take derivatives w.r.t. _beta_
     //
     // In many of these, we force evaluation of the return object
     // (which would otherwise be calculated lazily) to avoid a nasty segfault
     // resulting from un-mapped memory
 
+    std::function<double(const arma::vec&)> f;
+    std::function<arma::vec(const arma::vec&)> f_prime;
     std::function<arma::vec(const arma::vec&)> g;
     std::function<arma::vec(const arma::vec&)> g_prime;
 
+    double alpha = 0; // Put this declaration early for lambda capture
+
     if(family == EXLASSO_GLM_FAMILY_GAUSSIAN){
+        f = [&](const arma::vec& eta){
+            return 1/(2.0 * n) * norm_sq(y - eta, w);
+        };
+
+        f_prime = [&](const arma::vec& eta){
+            return (-X.t() * arma::diagmat(w/n) * (y - eta)).eval();
+        };
+
         g = [&](const arma::vec& eta){
             return eta;
         };
@@ -618,6 +635,14 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
             return (arma::vec(eta.n_elem, arma::fill::ones)).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_LOGISTIC) {
+        f = [&](const arma::vec& eta){
+            return arma::dot(w/n, arma::log(1 + arma::exp(eta)) - y % eta);
+        };
+
+        f_prime = [&](const arma::vec& eta){
+            return (-X.t() * arma::diagmat(w/n) * (y - inv_logit(eta))).eval();
+        };
+
         g = [&](const arma::vec& eta){
             return (inv_logit(eta)).eval();
         };
@@ -626,6 +651,14 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
             return ((inv_logit(eta)) % (1 - inv_logit(eta))).eval();
         };
     } else if(family == EXLASSO_GLM_FAMILY_POISSON){
+        f = [&](const arma::vec& eta){
+            return arma::dot(w/n, arma::exp(eta) - y % eta);
+        };
+
+        f_prime = [&](const arma::vec& eta){
+            return (-X.t() * arma::diagmat(w/n) * (y - arma::exp(eta))).eval();
+        };
+
         g = [&](const arma::vec& eta){
             return (arma::exp(eta)).eval();
         };
@@ -637,7 +670,6 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
         Rcpp::stop("[exclusive_lasso_glm] Unrecognized GLM family code.");
     }
 
-    double alpha = 0;
     arma::vec beta_working(p, arma::fill::zeros);
     arma::vec eta = o;
     arma::vec mu  = g(eta);
@@ -663,6 +695,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 
     arma::vec beta_cd_old(p, arma::fill::zeros);
     arma::vec beta_sqa_old(p, arma::fill::zeros);
+    double    alpha_old;
 
     arma::vec Alpha(n_lambda, arma::fill::zeros); // Storage for intercepts
 
@@ -691,7 +724,8 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
         K = 0; // Reset SQA loop counter
 
         do{ // Outer SQA Loop
-            beta_sqa_old = beta_working;
+            beta_sqa_old = beta_working; // Save these for PN back-tracking
+            alpha_old    = alpha;
             arma::vec u(p);
             for(uint i=0; i<p; i++){
                 u(i) = arma::sum(arma::square(X.col(i)) % combined_weights);
@@ -766,8 +800,48 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
             full_loop = false;
             full_loop_count = 0;
 
-            // Update SQA
+            // PN Back-tracking search
+            // See Algorithm 2.1 of Byrd, Nocedal, Oztoprak (2016) or
+            // Slide 9 of http://www.stat.cmu.edu/~ryantibs/convexopt-F15/lectures/17-prox-newton.pdf
+            const arma::vec delta_beta  = beta_working - beta_sqa_old;
+            const double    delta_alpha = alpha - alpha_old;
+            double t = 1;
+
+            const double penalty_old   = lambda(i) * exclusive_lasso_penalty(beta_sqa_old, groups);
+            const double objective_old = f(eta) + penalty_old;
+            const arma::vec grad_old   = f_prime(eta);
+
+            int k_backtrack = 0;
+            double descent_achieved;
+
+            do {
+                k_backtrack++;
+
+                const arma::vec beta_new = (beta_sqa_old + t * delta_beta);
+                const double   alpha_new = (alpha_old + t * delta_alpha);
+                const arma::vec  eta_new = X * beta_new + o + alpha_new;
+
+                const double penalty_new   = lambda(i) * exclusive_lasso_penalty(beta_new, groups);
+                const double objective_new = f(eta_new) + penalty_new;
+
+                // FIXME -- This isn't quite right since we aren't including the gradient w.r.t. alpha
+                if(objective_new < objective_old + EXLASSO_BACKTRACK_ALPHA * (t * arma::dot(delta_beta, grad_old) + penalty_new - penalty_old)){
+                    descent_achieved = true;
+                } else {
+                    t *= EXLASSO_BACKTRACK_BETA;
+                }
+
+                if(k_backtrack > 20){
+                    descent_achieved = true;
+                    t = 0;
+                }
+            } while (!descent_achieved);
+
+            beta_working = (beta_sqa_old + t * delta_beta);
+            alpha = (alpha_old + t * delta_alpha);
             eta = X * beta_working + o + alpha;
+
+            // Update SQA
             mu  = g(eta);
             fitting_weights = g_prime(eta);
 

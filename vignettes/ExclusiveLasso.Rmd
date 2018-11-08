@@ -463,8 +463,8 @@ linear models because they reduce to solving a series of penalized
 weighted linear regression problems (similar to the IRLS method which solves
 unpenalized GLMs by successively fitting weighted least squares) and allow us
 to use the efficient algorithm we have already developed for the linear case,
-namely coordinate descent. Like `glmnet`, we do not use a back-tracking rule
-to guarantee descent.
+namely coordinate descent. Unlike `glmnet`, we include a back-tracking step
+to guarantee descent in difficult problems.
 
 As with proximal gradient, the implementation of this algorithm is made much
 easier by taking advantage of the structure of GLMs. In particular, we note that
@@ -547,8 +547,23 @@ scheme derived above, yielding our proximal Newton algorithm:
             - Update working residual: $\br := \br + \alpha$
             - Update intercept: $\alpha = \langle \br, \text{diag}(\bW\tilde{\bW})/n \rangle$
             - Update working residual: $\br := \br - \alpha$
+    - Set $t = 1$
+    - Calculate Newton directions:
+        - $\Delta \beta = \beta - \beta_{\text{previous}}$
+        - $\Delta \alpha = \alpha - \alpha_{\text{previous}}$
+    - Repeat: (proximal Newton backtracking search)
+        - Set $\beta_{\text{new}} = \beta_{\text{previous}} + t * \Delta \beta$
+        - Set $\alpha_{\text{new}} = \alpha_{\text{previous}} + t * \Delta \alpha$
+        - If^[Note that we omit the gradient with respect to $\alpha$ from the RHS of the 
+              descent check. Since this makes the check (slightly) more rigorous, this
+              is not a problem.]
+            \[f(\beta_{\text{new}}, \alpha_{\text{new}}) < f(\beta_{\text{previous}}, \alpha_{\text{previous}}) + 0.5 \left(t * \langle \nabla_{\beta = \beta_{\text{previous}}}\ell, \Delta \beta\rangle + \lambda P(\beta_{\text{new}}) - \lambda P(\beta_{\text{previous}})\right):\]
+            - $\texttt{break}$
+        - Else: 
+            - Set $t = 0.8 * t$^[The step-size decrease rate can be controlled 
+              by the pre-processor macro `EXLASSO_BACKTRACK_BETA`.]
     - Update quadratic approximation: 
-        - $\eta = \bX\beta + \alpha + \bo$
+        - $\eta = \bX\beta_{\text{new}} + \alpha_{\text{new}} + \bo$
         - $\mu  = g(\eta)$
         - $\widetilde{\bw} = g'(\eta)$
         - $\bz = \widetilde{\bW}^{-1}(y - g(\eta)) + \eta$
@@ -565,8 +580,6 @@ extensions of calculations performed above:
 | Gaussian | $1$                     | $1$                         |
 | Logistic | $\textsf{inv-logit}(x) = 1 / (1 + e^{-x})$ | $(1 / (1 + e^{-x})) * (1 - 1 / (1 + e^{-x}))$
 | Poisson  | $\text{exp}(x)$ | $\text{exp}(x)$
-
-**FIXME: Add Backtracking for choosing Proximal Newton step size**
 
 ## Stationary Conditions
 

@@ -811,6 +811,9 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
             const double objective_old = f(eta) + penalty_old;
             const arma::vec grad_old   = f_prime(eta);
 
+            // FIXME? -- This seems to get better results but I think mu - y is the actual gradient...
+            const double  grad_int_old = arma::dot(w, y - mu)/n;
+
             int k_backtrack = 0;
             double descent_achieved;
 
@@ -824,8 +827,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
                 const double penalty_new   = lambda(i) * exclusive_lasso_penalty(beta_new, groups);
                 const double objective_new = f(eta_new) + penalty_new;
 
-                // FIXME -- This isn't quite right since we aren't including the gradient w.r.t. alpha
-                if(objective_new < objective_old + EXLASSO_BACKTRACK_ALPHA * (t * arma::dot(delta_beta, grad_old) + penalty_new - penalty_old)){
+                if(objective_new < objective_old + EXLASSO_BACKTRACK_ALPHA * (t * arma::dot(delta_beta, grad_old) + grad_int_old * delta_alpha + penalty_new - penalty_old)){
                     descent_achieved = true;
                 } else {
                     t *= EXLASSO_BACKTRACK_BETA;

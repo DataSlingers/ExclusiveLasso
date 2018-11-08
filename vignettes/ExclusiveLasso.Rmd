@@ -502,26 +502,24 @@ Using our above expressions for $\nabla \ell$ and $\mathcal{H} \ell$, this becom
 
 \[\begin{align*}
 \argmin_{\beta} \ell(\beta_0) + \langle\nabla_{\beta = \beta_0}\ell - \mathcal{H}_{\beta = \beta_0}\beta_0, \beta \rangle + \frac{\beta^T (\mathcal{H}_{\beta = \beta_0}\ell)\beta}{2} + \lambda P(\beta) \\
-\argmin_{\beta} \ell(\beta_0) + \langle -\bX^T\bW(y - g(\bX\beta_0 + \bo))/n - \bX^T\bW\widetilde{\bW}/n\bX\beta_0, \beta\rangle + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta)\\
-\argmin_{\beta} \ell(\beta_0) -\frac{(y - g(\bX\beta_0 + \bo) - \widetilde{\bW}\bX\beta_0)^T\bW\bX\beta}{n} + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta) \\
-\argmin_{\beta} \ell(\beta_0) -\frac{\left(\widetilde{\bW}^{-1}(y - g(\bX\beta_0 + \bo) - \bX\beta_0\right)^T\bW\widetilde{\bW}\bX\beta}{n} + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta) \\
+\argmin_{\beta} \ell(\beta_0) + \langle -\bX^T\bW(\by - g(\bX\beta_0 + \bo))/n - \bX^T\bW\widetilde{\bW}/n\bX\beta_0, \beta\rangle + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta)\\
+\argmin_{\beta} \ell(\beta_0) -\frac{(\by - g(\bX\beta_0 + \bo) - \widetilde{\bW}\bX\beta_0)^T\bW\bX\beta}{n} + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta) \\
+\argmin_{\beta} \ell(\beta_0) -\frac{\left(\widetilde{\bW}^{-1}(\by - g(\bX\beta_0 + \bo) - \bX\beta_0\right)^T\bW\widetilde{\bW}\bX\beta}{n} + \frac{\beta^T\bX^T\bW\widetilde{\bW}\bX\beta}{2n} + \lambda P(\beta) \\
 \end{align*}\]
 
 We note that this quadratic approximation is of the same form as a weighted Gaussian likelihood
 
-\[\argmin_{\beta} \frac{(\by - \bX\beta - \bo)^T\bW(\by - \bX\beta - \bo)}{2n} + \lambda P(\beta) = \argmin_{\beta}\frac{\by^T\bW\by}{2n} - \frac{\by^T\bW\bX\beta}{2n} + \frac{\beta^T\bX^T\bW\bX^T\beta}{n} + \lambda P(\beta)\]
+\[\argmin_{\beta} \frac{(\by - \bX\beta)^T\bW(\by - \bX\beta)}{2n} + \lambda P(\beta) = \argmin_{\beta}\frac{\by^T\bW\by}{2n} - \frac{\by^T\bW\bX\beta}{2n} + \frac{\beta^T\bX^T\bW\bX^T\beta}{n} + \lambda P(\beta)\]
 
 Aligning terms, we write our quadratic approximation as a weighted Gaussian problem
 
-\[\argmin_{\beta} \ell(\beta_0) -\frac{\left(\widetilde{\bW}^{-1}(y - g(\bX\beta_0 + \bo) - \bX\beta_0\right)^T\bW\widetilde{\bW}\bX\beta}{n} + \frac{\beta\bX^T(\bW\widetilde{\bW})\bX\beta}{2n} + \lambda P(\beta) = \argmin_{\beta} \frac{(\bz - \bX\beta - \bo)(\bW\widetilde{\bW}) (\bz - \bX\beta - \bo)}{2n} + \lambda P(\beta)\]
+\[\argmin_{\beta} \ell(\beta_0) -\frac{\left(\widetilde{\bW}^{-1}(\by - g(\bX\beta_0 + \bo) - \bX\beta_0\right)^T\bW\widetilde{\bW}\bX\beta}{n} + \frac{\beta\bX^T(\bW\widetilde{\bW})\bX\beta}{2n} + \lambda P(\beta) = \argmin_{\beta} \frac{(\bz - \bX\beta)(\bW\widetilde{\bW}) (\bz - \bX\beta)}{2n} + \lambda P(\beta)\]
 
 where $\bz = \widetilde{\bW}^{-1}(\by - g(\bX\beta_0 + \bo)) + \bX\beta_0$. We note
 that this scheme is very similar to the IRLS (iteratively reweighted least squares)
 algorithm used to fit unpenalized GLMs, though IRLS implementations sometimes use
 the expected value of $\widetilde{\bW}$ at $\beta_0$ rather than the observed value, 
 which gives them a sort of regularized quasi-Newton flavor.
-
-**FIXME** The above drops an offset term somewhere...
 
 Since this problem has been put in Gaussian form, we can re-use the coordinate descent
 scheme derived above, yielding our proximal Newton algorithm: 
@@ -554,10 +552,11 @@ scheme derived above, yielding our proximal Newton algorithm:
     - Repeat: (proximal Newton backtracking search)
         - Set $\beta_{\text{new}} = \beta_{\text{previous}} + t * \Delta \beta$
         - Set $\alpha_{\text{new}} = \alpha_{\text{previous}} + t * \Delta \alpha$
-        - If^[Note that we omit the gradient with respect to $\alpha$ from the RHS of the 
-              descent check. Since this makes the check (slightly) more rigorous, this
-              is not a problem.]
-            \[f(\beta_{\text{new}}, \alpha_{\text{new}}) < f(\beta_{\text{previous}}, \alpha_{\text{previous}}) + 0.5 \left(t * \langle \nabla_{\beta = \beta_{\text{previous}}}\ell, \Delta \beta\rangle + \lambda P(\beta_{\text{new}}) - \lambda P(\beta_{\text{previous}})\right):\]
+        - If
+            \[f(\beta_{\text{new}}, \alpha_{\text{new}}) < f(\beta_{\text{previous}}, \alpha_{\text{previous}}) + 
+              0.5 \left(t * \langle \nabla_{\beta = \beta_{\text{previous}}}\ell, \Delta \beta \rangle + 
+                        t * \langle \nabla_{\alpha = \alpha_{\text{previous}}}\ell, \Delta \alpha \rangle + 
+                        \lambda P(\beta_{\text{new}}) - \lambda P(\beta_{\text{previous}})\right):\]
             - $\texttt{break}$
         - Else: 
             - Set $t = 0.8 * t$^[The step-size decrease rate can be controlled 
@@ -568,6 +567,11 @@ scheme derived above, yielding our proximal Newton algorithm:
         - $\widetilde{\bw} = g'(\eta)$
         - $\bz = \widetilde{\bW}^{-1}(y - g(\eta)) + \eta$
         - $\br = \bz - \eta$
+        
+Note that the gradient with respect to the intercept is simply $\langle \bw_o, \by - g(\eta_{\text{previous}}))/n$
+for all of the families considered. This follows from the more general result shown
+above that gradients are of the form $-\bX^T \bW (\by - g(\bX\beta + \bo + \alpha))/n$
+and the fact that an intercept corresponds to an "all 1" column of the design matrix.
 
 If we wish to include box constraints of the form $l_i \leq \beta_i \leq u_i$, we
 can simply directly impose these after each soft-thresholding step.

@@ -19,3 +19,11 @@ VignetteBuilder: knitr
 GitHash: $GITHASH$
 BugReports: https://github.com/DataSlingers/ExclusiveLasso/issues
 URL: https://github.com/DataSlingers/ExclusiveLasso
+Collate: 
+    'ExclusiveLasso-package.R'
+    'internals.R'
+    'ExclusiveLasso.R'
+    'RcppExports.R'
+    'check_kkt.R'
+    'cv.R'
+    'plots.R'

@@ -1,5 +1,6 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
 #include <limits>
+#include <cmath>
 
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE 50
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE_GLM 10
@@ -47,7 +48,7 @@ double norm_sq(const arma::vec& x, const arma::vec& w){
 double exclusive_lasso_penalty(const arma::vec& x, const arma::ivec& groups){
     double ans = 0;
 
-    for(arma::uword g = arma::min(groups); g <= arma::max(groups); g++){
+    for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
         ans += pow(arma::norm(x(arma::find(g == groups)), 1), 2);
     }
 
@@ -69,7 +70,7 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
 
     // TODO -- parallelize?
     // Loop over groups
-    for(arma::uword g = arma::min(groups); g <= arma::max(groups); g++){
+    for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
         // Identify elements in group
         arma::uvec g_ix = arma::find(g == groups);
         int g_n_elem = g_ix.n_elem;
@@ -83,7 +84,7 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
             int k = 0;
             beta_g_old = beta_g;
             for(int i=0; i<g_n_elem; i++){
-                double thresh_level = arma::norm(beta_g, 1) - fabs(beta_g(i));
+                double thresh_level = arma::norm(beta_g, 1) - std::abs(beta_g(i));
                 beta_g(i) = 1/(lambda + 1) * soft_thresh(z_g(i), lambda * thresh_level);
 
                 // Impose box constraints
@@ -125,8 +126,8 @@ Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X,
     arma::vec Xty = X.t() * (w % (y - o)/n);
     double L = arma::max(arma::eig_sym(XtX));
 
-    uint beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
-    uint beta_nnz = 0;
+    arma::uword beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
+    arma::uword beta_nnz = 0;
     arma::umat Beta_storage_ind(2, beta_nnz_approx);
     arma::vec  Beta_storage_vec(beta_nnz_approx);
 
@@ -134,7 +135,7 @@ Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X,
     arma::vec Alpha(n_lambda, arma::fill::zeros);
 
     // Number of prox gradient iterations -- used to check for interrupts
-    uint k = 0;
+    arma::uword k = 0;
 
     arma::vec beta(p, arma::fill::zeros);
     double alpha = 0;
@@ -179,7 +180,7 @@ Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X,
         }
 
         // Load sparse matrix storage
-        for(uint j=0; j < p; j++){
+        for(arma::uword j=0; j < p; j++){
             if(beta(j) != 0){
                 // We want to have a coefficient matrix
                 // where rows are features and columns are values of lambda
@@ -242,8 +243,8 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X,
     arma::uword p = X1.n_cols;
     arma::uword n_lambda = lambda.n_elem;
 
-    uint beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
-    uint beta_nnz = 0;
+    arma::uword beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
+    arma::uword beta_nnz = 0;
     arma::umat Beta_storage_ind(2, beta_nnz_approx);
     arma::vec  Beta_storage_vec(beta_nnz_approx);
 
@@ -254,7 +255,7 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X,
     arma::vec Alpha(n_lambda, arma::fill::zeros);
 
     // Number of prox gradient iterations -- used to check for interrupts
-    uint k = 0;
+    arma::uword k = 0;
 
     arma::vec beta(p, arma::fill::zeros);
     arma::vec beta_old(p);
@@ -377,7 +378,7 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X,
         }
 
         // Load sparse matrix storage
-        for(uint j=0; j < p; j++){
+        for(arma::uword j=0; j < p; j++){
             if(beta(j) != 0){
                 if(intercept && (j == p - 1)){
                     // Handle intercept specially
@@ -436,7 +437,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
     double alpha = 0;
 
     arma::vec u(p);
-    for(uint i=0; i<p; i++){
+    for(arma::uword i=0; i<p; i++){
         u(i) = arma::sum(arma::square(X.col(i)) % w);
     }
 
@@ -448,8 +449,8 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
     // so this is tight, but should be safe generally.
     arma::vec g_norms(arma::max(groups) + 1, arma::fill::zeros);
 
-    uint beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
-    uint beta_nnz = 0;
+    arma::uword beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
+    arma::uword beta_nnz = 0;
     arma::umat Beta_storage_ind(2, beta_nnz_approx);
     arma::vec  Beta_storage_vec(beta_nnz_approx);
 
@@ -458,15 +459,15 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
     arma::vec Alpha(n_lambda, arma::fill::zeros); // Storage for intercepts
 
     // Number of cd iterations -- used to check for interrupts
-    uint k = 0;
+    arma::uword k = 0;
 
     // For first iteration we want to loop over all variables since
     // we haven't identified the active set yet
     bool full_loop = true;
-    uint full_loop_count = 0; // Number of full loops completed
-                              // We require at least EXLASSO_FULL_LOOP_MIN
-                              // full loops before moving to the next value
-                              // of lambda to ensure convergence
+    arma::uword full_loop_count = 0; // Number of full loops completed
+                                     // We require at least EXLASSO_FULL_LOOP_MIN
+                                     // full loops before moving to the next value
+                                     // of lambda to ensure convergence
 
     // Iterate from highest to smallest lambda
     // to take advantage of
@@ -476,7 +477,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
 
         do {
             beta_old = beta_working;
-            for(int j=0; j < p; j++){
+            for(arma::uword j=0; j < p; j++){
                 double beta = beta_working(j);
 
                 if((!full_loop) && (beta == 0)){
@@ -486,8 +487,8 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                 const arma::vec xj = X.col(j);
                 r += xj * beta;
 
-                uint g = groups(j);
-                g_norms(g) -= fabs(beta);
+                arma::sword g = groups(j);
+                g_norms(g) -= std::abs(beta);
 
                 double z = arma::dot(r % w, xj);
                 double lambda_til = nl * g_norms(g);
@@ -501,7 +502,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                 }
 
                 r -= xj * beta;
-                g_norms(g) += fabs(beta);
+                g_norms(g) += std::abs(beta);
 
                 beta_working(j) = beta;
             }
@@ -543,7 +544,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
         }
 
         // Load sparse matrix storage
-        for(uint j=0; j < p; j++){
+        for(arma::uword j=0; j < p; j++){
             if(beta_working(j) != 0){
                 // We want to have a coefficient matrix
                 // where rows are features and columns are values of lambda
@@ -688,8 +689,8 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
     // so this is tight, but should be safe generally.
     arma::vec g_norms(arma::max(groups) + 1, arma::fill::zeros);
 
-    uint beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
-    uint beta_nnz = 0;
+    arma::uword beta_nnz_approx = EXLASSO_PREALLOCATION_FACTOR * p;
+    arma::uword beta_nnz = 0;
     arma::umat Beta_storage_ind(2, beta_nnz_approx);
     arma::vec  Beta_storage_vec(beta_nnz_approx);
 
@@ -700,15 +701,15 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
     arma::vec Alpha(n_lambda, arma::fill::zeros); // Storage for intercepts
 
     // Number of cd iterations -- used to check for interrupts
-    uint k = 0;
+    arma::uword k = 0;
 
     // Number of SQA iterations
-    uint K = 0;
+    arma::uword K = 0;
 
     // For first iteration we want to loop over all variables since
     // we haven't identified the active set yet
     bool full_loop = true;
-    uint full_loop_count = 0; // Number of full loops completed
+    arma::uword full_loop_count = 0; // Number of full loops completed
 
     // We require at least EXLASSO_FULL_LOOP_MIN
     // full loops before moving to the next value
@@ -727,7 +728,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
             beta_sqa_old = beta_working; // Save these for PN back-tracking
             alpha_old    = alpha;
             arma::vec u(p);
-            for(uint i=0; i<p; i++){
+            for(arma::uword i=0; i<p; i++){
                 u(i) = arma::sum(arma::square(X.col(i)) % combined_weights);
             }
 
@@ -735,7 +736,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 
             do { // Inner CD Loop
                 beta_cd_old = beta_working;
-                for(int j=0; j < p; j++){
+                for(arma::uword j=0; j < p; j++){
                     double beta = beta_working(j);
 
                     if((!full_loop) && (beta == 0)){
@@ -745,8 +746,8 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
                     const arma::vec xj = X.col(j);
                     r += xj * beta;
 
-                    uint g = groups(j);
-                    g_norms(g) -= fabs(beta);
+                    arma::sword g = groups(j);
+                    g_norms(g) -= std::abs(beta);
 
                     const double zeta = arma::dot(r % combined_weights, xj);
                     const double lambda_til = nl * g_norms(g);
@@ -761,7 +762,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 
                     r -= xj * beta;
 
-                    g_norms(g) += fabs(beta);
+                    g_norms(g) += std::abs(beta);
                     beta_working(j) = beta;
                 }
 
@@ -869,7 +870,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
         }
 
         // Load sparse matrix storage
-        for(uint j=0; j < p; j++){
+        for(arma::uword j=0; j < p; j++){
             if(beta_working(j) != 0){
                 // We want to have a coefficient matrix
                 // where rows are features and columns are values of lambda
@@ -926,7 +927,7 @@ arma::mat calculate_exclusive_lasso_df(const arma::mat& X,
         arma::mat M(X.n_cols, X.n_cols, arma::fill::zeros);
 
         // Loop over groups to build M matrix
-        for(arma::uword g = arma::min(groups); g <= arma::max(groups); g++){
+        for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
             // Identify elements in group
             arma::uvec g_ix = arma::find(g == groups);
             arma::vec  s_g  = arma::sign(coef(g_ix));

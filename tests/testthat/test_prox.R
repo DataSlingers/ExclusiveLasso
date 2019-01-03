@@ -134,3 +134,14 @@ test_that("prox never is fully sparse for any group", {
     expect_false(all(prox_x == 0))
     expect_true(all(unique(g) %in% g[prox_x != 0]))
 })
+
+test_that("negative group IDs are supported", {
+    set.seed(900)
+
+    n <- 200L
+    G <- 50L
+    x <- rnorm(n)
+    g <- rep.int(seq.int(0L, G - 1), n / G)
+
+    expect_equal(prox(x, g, 3), prox(x, -g, 3))
+})

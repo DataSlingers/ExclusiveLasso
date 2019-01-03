@@ -45,10 +45,10 @@ double norm_sq(const arma::vec& x, const arma::vec& w){
 }
 
 // [[Rcpp::export]]
-double exclusive_lasso_penalty(const arma::vec& x, const arma::uvec& groups){
+double exclusive_lasso_penalty(const arma::vec& x, const arma::ivec& groups){
     double ans = 0;
 
-    for(arma::uword g = arma::min(groups); g <= arma::max(groups); g++){
+    for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
         ans += pow(arma::norm(x(arma::find(g == groups)), 1), 2);
     }
 
@@ -57,7 +57,7 @@ double exclusive_lasso_penalty(const arma::vec& x, const arma::uvec& groups){
 
 // [[Rcpp::export]]
 arma::vec exclusive_lasso_prox(const arma::vec& z,
-                               const arma::uvec& groups,
+                               const arma::ivec& groups,
                                double lambda,
                                const arma::vec& lower_bound,
                                const arma::vec& upper_bound,
@@ -70,7 +70,7 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
 
     // TODO -- parallelize?
     // Loop over groups
-    for(arma::uword g = arma::min(groups); g <= arma::max(groups); g++){
+    for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
         // Identify elements in group
         arma::uvec g_ix = arma::find(g == groups);
         int g_n_elem = g_ix.n_elem;
@@ -108,7 +108,7 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
 // [[Rcpp::export]]
 Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X,
                                        const arma::vec& y,
-                                       const arma::uvec& groups,
+                                       const arma::ivec& groups,
                                        const arma::vec& lambda,
                                        const arma::vec& w,
                                        const arma::vec& o,
@@ -215,7 +215,7 @@ Rcpp::List exclusive_lasso_gaussian_pg(const arma::mat& X,
 // [[Rcpp::export]]
 Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X,
                                   const arma::vec& y,
-                                  const arma::uvec& groups,
+                                  const arma::ivec& groups,
                                   const arma::vec& lambda,
                                   const arma::vec& w,
                                   const arma::vec& o,
@@ -417,7 +417,7 @@ Rcpp::List exclusive_lasso_glm_pg(const arma::mat& X,
 // [[Rcpp::export]]
 Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                                        const arma::vec& y,
-                                       const arma::uvec& groups,
+                                       const arma::ivec& groups,
                                        const arma::vec& lambda,
                                        const arma::vec& w,
                                        const arma::vec& o,
@@ -487,7 +487,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                 const arma::vec xj = X.col(j);
                 r += xj * beta;
 
-                arma::uword g = groups(j);
+                arma::sword g = groups(j);
                 g_norms(g) -= std::abs(beta);
 
                 double z = arma::dot(r % w, xj);
@@ -579,7 +579,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
 // [[Rcpp::export]]
 Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
                                   const arma::vec& y,
-                                  const arma::uvec& groups,
+                                  const arma::ivec& groups,
                                   const arma::vec& lambda,
                                   const arma::vec& w,
                                   const arma::vec& o,
@@ -746,7 +746,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
                     const arma::vec xj = X.col(j);
                     r += xj * beta;
 
-                    arma::uword g = groups(j);
+                    arma::sword g = groups(j);
                     g_norms(g) -= std::abs(beta);
 
                     const double zeta = arma::dot(r % combined_weights, xj);
@@ -908,7 +908,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 // [[Rcpp::export]]
 arma::mat calculate_exclusive_lasso_df(const arma::mat& X,
                                        const arma::vec& lambda_vec,
-                                       const arma::uvec& groups,
+                                       const arma::ivec& groups,
                                        const arma::sp_mat& coefs){
 
     arma::vec res(lambda_vec.n_elem, arma::fill::zeros);
@@ -927,7 +927,7 @@ arma::mat calculate_exclusive_lasso_df(const arma::mat& X,
         arma::mat M(X.n_cols, X.n_cols, arma::fill::zeros);
 
         // Loop over groups to build M matrix
-        for(arma::uword g = arma::min(groups); g <= arma::max(groups); g++){
+        for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
             // Identify elements in group
             arma::uvec g_ix = arma::find(g == groups);
             arma::vec  s_g  = arma::sign(coef(g_ix));

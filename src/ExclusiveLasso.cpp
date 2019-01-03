@@ -477,7 +477,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
 
         do {
             beta_old = beta_working;
-            for(int j=0; j < p; j++){
+            for(arma::uword j=0; j < p; j++){
                 double beta = beta_working(j);
 
                 if((!full_loop) && (beta == 0)){
@@ -736,7 +736,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 
             do { // Inner CD Loop
                 beta_cd_old = beta_working;
-                for(int j=0; j < p; j++){
+                for(arma::uword j=0; j < p; j++){
                     double beta = beta_working(j);
 
                     if((!full_loop) && (beta == 0)){

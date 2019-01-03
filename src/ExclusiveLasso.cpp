@@ -1,5 +1,6 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
 #include <limits>
+#include <cmath>
 
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE 50
 #define EXLASSO_CHECK_USER_INTERRUPT_RATE_GLM 10
@@ -83,7 +84,7 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
             int k = 0;
             beta_g_old = beta_g;
             for(int i=0; i<g_n_elem; i++){
-                double thresh_level = arma::norm(beta_g, 1) - fabs(beta_g(i));
+                double thresh_level = arma::norm(beta_g, 1) - std::abs(beta_g(i));
                 beta_g(i) = 1/(lambda + 1) * soft_thresh(z_g(i), lambda * thresh_level);
 
                 // Impose box constraints
@@ -487,7 +488,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                 r += xj * beta;
 
                 arma::uword g = groups(j);
-                g_norms(g) -= fabs(beta);
+                g_norms(g) -= std::abs(beta);
 
                 double z = arma::dot(r % w, xj);
                 double lambda_til = nl * g_norms(g);
@@ -501,7 +502,7 @@ Rcpp::List exclusive_lasso_gaussian_cd(const arma::mat& X,
                 }
 
                 r -= xj * beta;
-                g_norms(g) += fabs(beta);
+                g_norms(g) += std::abs(beta);
 
                 beta_working(j) = beta;
             }
@@ -746,7 +747,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
                     r += xj * beta;
 
                     arma::uword g = groups(j);
-                    g_norms(g) -= fabs(beta);
+                    g_norms(g) -= std::abs(beta);
 
                     const double zeta = arma::dot(r % combined_weights, xj);
                     const double lambda_til = nl * g_norms(g);
@@ -761,7 +762,7 @@ Rcpp::List exclusive_lasso_glm_cd(const arma::mat& X,
 
                     r -= xj * beta;
 
-                    g_norms(g) += fabs(beta);
+                    g_norms(g) += std::abs(beta);
                     beta_working(j) = beta;
                 }
 

@@ -57,6 +57,7 @@ cv.exclusive_lasso <- function(X, y, groups, ...,
 
     tic <- Sys.time()
 
+    family       <- match.arg(family)
     type.measure <- match.arg(type.measure)
 
     ## The full data fit below will handle most input checking, but this needs to

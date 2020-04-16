@@ -1,5 +1,5 @@
 ## CI Files
-^\.travis\.yml$
+^.github$
 ^codecov\.yml$
 ^appveyor\.yml$
 
@@ -8,6 +8,7 @@
 ^\.Rproj\.user$
 
 ## Pkgdown docs
+_pkgdown.yml
 ^docs$
 
 ## GH files (not part of package)

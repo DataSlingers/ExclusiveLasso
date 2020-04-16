@@ -4,7 +4,7 @@ author: "Michael Weylandt"
 date: "October 23, 2018"
 output:
   md_document:
-    variant: markdown_github
+    variant: gfm
 ---
 
 <!--  -*- coding: utf-8 -*- -->

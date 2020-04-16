@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-[![Travis-CI Build Status](https://api.travis-ci.com/DataSlingers/ExclusiveLasso.svg?branch=develop)](https://travis-ci.com/DataSlingers/ExclusiveLasso) [![codecov](https://codecov.io/gh/DataSlingers/ExclusiveLasso/branch/develop/graph/badge.svg)](https://codecov.io/gh/DataSlingers/ExclusiveLasso) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/ExclusiveLasso)](https://cran.r-project.org/package=ExclusiveLasso) [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![GitHub Actions Build Status](https://github.com/DataSlingers/ExclusiveLasso/workflows/R-CMD-check and Deploy/badge.svg)](https://github.com/DataSlingers/ExclusiveLasso/actions?query=workflow%3A%22R-CMD-check+and+Deploy%22) [![codecov](https://codecov.io/gh/DataSlingers/ExclusiveLasso/branch/develop/graph/badge.svg)](https://codecov.io/gh/DataSlingers/ExclusiveLasso) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/ExclusiveLasso)](https://cran.r-project.org/package=ExclusiveLasso) [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
 ## The Exclusive Lasso
 

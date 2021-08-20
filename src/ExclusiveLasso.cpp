@@ -55,13 +55,72 @@ double exclusive_lasso_penalty(const arma::vec& x, const arma::ivec& groups){
     return ans / 2.0;
 }
 
-// [[Rcpp::export]]
+arma::vec exclusive_lasso_new_prox_inner(const arma::vec& z,
+                                         const arma::ivec& groups,
+                                         double lambda){
+
+    arma::uword p = z.n_elem;
+    arma::vec beta(p);
+
+    // TODO -- parallelize?
+    // Loop over groups
+    for(arma::sword g = arma::min(groups); g <= arma::max(groups); g++){
+        // Identify elements in group
+        arma::uvec g_ix = arma::find(g == groups);
+        int g_n_elem = g_ix.n_elem;
+
+        arma::vec z_g = z(g_ix);
+        arma::uvec z_g_sort_ix = arma::sort_index(z_g, "descend");
+        arma::vec z_g_sorted = arma::sort(z_g, "descend");
+
+        arma::vec s = arma::cumsum(z_g_sorted);
+        arma::vec L = arma::regspace(1, g_n_elem);
+        // Remove the factor of 2 here and in beta_g to match our other scaling
+        arma::vec alpha = s / (1 + lambda * L);
+        double alpha_bar = arma::max(alpha);
+
+        arma::vec beta_g = (z_g - lambda * alpha_bar);
+        beta_g = beta_g % (beta_g >= 0);
+
+        beta(g_ix) = beta_g;
+    }
+    return beta;
+}
+
+
+//[[Rcpp::export]]
 arma::vec exclusive_lasso_prox(const arma::vec& z,
-                               const arma::ivec& groups,
+                               const arma::ivec groups,
                                double lambda,
                                const arma::vec& lower_bound,
                                const arma::vec& upper_bound,
                                double thresh=1e-7){
+    bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
+
+    if(apply_box_constraints){
+        Rcpp::stop("Box constraints not yet supported in new prox.");
+    }
+
+    arma::vec result = arma::sign(z) % exclusive_lasso_new_prox_inner(arma::abs(z), groups, lambda);
+
+    for(int i=0; i<z.n_elem; i++){
+        // Impose box constraints
+        if(apply_box_constraints){
+            result(i) = std::fmax(result(i), lower_bound(i));
+            result(i) = std::fmin(result(i), upper_bound(i));
+        }
+    }
+
+    return result;
+}
+
+// [[Rcpp::export]]
+arma::vec exclusive_lasso_prox_old(const arma::vec& z,
+                                   const arma::ivec& groups,
+                                   double lambda,
+                                   const arma::vec& lower_bound,
+                                   const arma::vec& upper_bound,
+                                   double thresh=1e-7){
 
     bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
 

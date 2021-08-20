@@ -98,7 +98,7 @@ arma::vec exclusive_lasso_prox(const arma::vec& z,
     bool apply_box_constraints = arma::any(lower_bound != -EXLASSO_INF) || arma::all(upper_bound != EXLASSO_INF);
 
     if(apply_box_constraints){
-        Rcpp::stop("Box constraints not yet supported in new prox.");
+        return exclusive_lasso_prox_old(z, groups, lambda, lower_bound, upper_bound, thresh);
     }
 
     arma::vec result = arma::sign(z) % exclusive_lasso_new_prox_inner(arma::abs(z), groups, lambda);
